@@ -17,11 +17,11 @@ function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
 
-function messageFor(error: string) {
+function messageFor(error: string, code?: string) {
   if (error.includes("CAPACITY_EXCEEDED")) return "同じ時間帯の店内人数が8名を超えるため保存できません。";
   if (error.includes("PARKING_UNAVAILABLE")) return "同じ時間帯に駐車場を利用する予約があります。";
   if (error.includes("INVALID_RESERVATION")) return "入力内容を確認してください。";
-  return "予約を保存できませんでした。もう一度お試しください。";
+  return `予約を保存できませんでした。エラー: ${code ? `${code} / ` : ""}${error}`;
 }
 
 export async function saveReservation(formData: FormData): Promise<ActionResult> {
@@ -36,7 +36,7 @@ export async function saveReservation(formData: FormData): Promise<ActionResult>
     p_phone: text(formData, "phone"), p_email: text(formData, "email") || null,
     p_note: text(formData, "note") || null, p_source: text(formData, "source"),
   });
-  if (error) return { ok: false, message: messageFor(error.message) };
+  if (error) return { ok: false, message: messageFor(error.message, error.code) };
   revalidatePath("/admin");
   return { ok: true, message: "予約を保存しました。" };
 }
