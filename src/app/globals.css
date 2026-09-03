@@ -24,3 +24,10 @@
 .settings-fields input[type="color"]{height:54px;padding:5px;cursor:pointer}
 @media(max-width:900px){.reference-hero{background-image:var(--hero-mobile-image)}}
 @media(max-width:600px){.public-site .section h2,.public-site .reference-hero h1{font-size:var(--heading-size)}}
+
+/* Image size guidance in the CMS */
+.image-edit-grid article>b:after{display:block;margin-top:3px;color:var(--muted);font-size:10px;font-weight:400}
+.image-edit-grid article:nth-child(1)>b:after{content:"推奨 1920 × 1080px（横長・16:9）"}
+.image-edit-grid article:nth-child(2)>b:after{content:"推奨 1080 × 1350px（縦長・4:5）"}
+.image-edit-grid article:nth-child(3)>b:after{content:"推奨 1200 × 900px（横長・4:3）"}
+.manager-fields label:nth-of-type(4):after{content:"推奨 1200 × 1500px（縦長・4:5）";color:var(--muted);font-size:9px;font-weight:400}
