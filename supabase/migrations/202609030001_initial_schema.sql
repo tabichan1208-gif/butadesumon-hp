@@ -100,6 +100,10 @@ create or replace function public.is_staff() returns boolean language sql stable
   select exists (select 1 from public.profiles where id = auth.uid() and role in ('STAFF', 'ADMIN'));
 $$;
 
+create or replace function public.is_admin() returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'ADMIN');
+$$;
+
 create or replace function public.touch_updated_at() returns trigger language plpgsql set search_path = '' as $$
 begin new.updated_at = now(); return new; end;
 $$;
@@ -166,7 +170,8 @@ alter table public.pigs enable row level security;
 alter table public.faqs enable row level security;
 alter table public.media_assets enable row level security;
 
-create policy staff_profiles on public.profiles for all to authenticated using (public.is_staff()) with check (public.is_staff());
+create policy own_profile_read on public.profiles for select to authenticated using (id = auth.uid());
+create policy admin_profiles on public.profiles for all to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy staff_reservations on public.reservations for all to authenticated using (public.is_staff()) with check (public.is_staff());
 create policy public_settings_read on public.site_settings for select to anon, authenticated using (true);
 create policy public_content_read on public.site_content for select to anon, authenticated using (published);
