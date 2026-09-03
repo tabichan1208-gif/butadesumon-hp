@@ -32,8 +32,9 @@ function ReservationPanel({reservations}:{reservations:AdminReservation[]}) {
   const [notice,setNotice]=useState("");
   const [pending,startTransition]=useTransition();
   const dayReservations=useMemo(()=>reservations.filter(r=>r.date===selectedDate),[reservations,selectedDate]);
-  const totalGuests=dayReservations.reduce((sum,r)=>sum+r.guests,0);
-  const peak=useMemo(()=>Math.max(0,...timeline(dayReservations).map(slot=>slot.guests)),[dayReservations]);
+  const activeReservations=useMemo(()=>dayReservations.filter(r=>r.status!=="CANCELLED"),[dayReservations]);
+  const totalGuests=activeReservations.reduce((sum,r)=>sum+r.guests,0);
+  const peak=useMemo(()=>Math.max(0,...timeline(activeReservations).map(slot=>slot.guests)),[activeReservations]);
 
   function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();const data=new FormData(e.currentTarget);startTransition(async()=>{const result=await saveReservation(data);setNotice(result.message);if(result.ok){setEditing(null);router.refresh()}})}
   function cancel(id:string){if(!confirm("この予約をキャンセルしますか？"))return;startTransition(async()=>{const result=await cancelReservation(id);setNotice(result.message);if(result.ok){setEditing(null);router.refresh()}})}
@@ -41,8 +42,8 @@ function ReservationPanel({reservations}:{reservations:AdminReservation[]}) {
   return <>
     <div className="reservation-toolbar"><label>表示する日<input type="date" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)}/></label><button className="button" onClick={()=>setEditing("new")}>＋ 予約を追加</button></div>
     {notice&&<p className="admin-notice">{notice}</p>}
-    <div className="admin-cards"><article><span>予約</span><b>{dayReservations.length}<small>件</small></b><em>選択日の予約</em></article><article><span>ご来店予定</span><b>{totalGuests}<small>名</small></b><em>延べ人数</em></article><article><span>最大同時人数</span><b>{peak}<small>/ 8名</small></b><em>{peak<8?"空きあり":"満員時間あり"}</em></article><article><span>駐車場予約</span><b>{dayReservations.filter(r=>r.parking).length}<small>件</small></b><em>時間の重複を自動防止</em></article></div>
-    <div className="admin-reservation-layout"><div className="admin-panel"><div className="panel-head"><div><h2>{formatDate(selectedDate)}の予約</h2><p>予約を選ぶと編集できます</p></div></div><div className="reservation-list">{dayReservations.length===0?<p className="empty-state">この日の予約はありません。</p>:dayReservations.map(r=><button className="reservation-row" key={r.id} onClick={()=>setEditing(r)}><time>{r.time}<small>{r.minutes}分</small></time><div className="res-main"><div><span className="source">{sourceLabels[r.source]??r.source}</span><h3>{r.name} 様</h3><small>{r.phone}</small></div><p>人数 <b>{r.guests}名</b></p><p>駐車場 <b>{r.parking?"あり":"なし"}</b></p><span>›</span></div></button>)}</div></div><Timeline reservations={dayReservations}/></div>
+    <div className="admin-cards"><article><span>予約</span><b>{activeReservations.length}<small>件</small></b><em>選択日の有効な予約</em></article><article><span>ご来店予定</span><b>{totalGuests}<small>名</small></b><em>延べ人数</em></article><article><span>最大同時人数</span><b>{peak}<small>/ 8名</small></b><em>{peak<8?"空きあり":"満員時間あり"}</em></article><article><span>駐車場予約</span><b>{activeReservations.filter(r=>r.parking).length}<small>件</small></b><em>時間の重複を自動防止</em></article></div>
+    <div className="admin-reservation-layout"><div className="admin-panel"><div className="panel-head"><div><h2>{formatDate(selectedDate)}の予約</h2><p>キャンセル済みも履歴として残ります</p></div></div><div className="reservation-list">{dayReservations.length===0?<p className="empty-state">この日の予約はありません。</p>:dayReservations.map(r=><button className={`reservation-row${r.status==="CANCELLED"?" cancelled":""}`} key={r.id} onClick={()=>r.status!=="CANCELLED"&&setEditing(r)} disabled={r.status==="CANCELLED"}><time>{r.time}<small>{r.minutes}分</small></time><div className="res-main"><div><span className="source">{sourceLabels[r.source]??r.source}</span>{r.status==="CANCELLED"&&<span className="cancelled-label">キャンセル済み</span>}<h3>{r.name} 様</h3><small>{r.phone}</small></div><p>人数 <b>{r.guests}名</b></p><p>駐車場 <b>{r.parking?"あり":"なし"}</b></p><span>{r.status==="CANCELLED"?"":"›"}</span></div></button>)}</div></div><Timeline reservations={activeReservations}/></div>
     {editing&&<ReservationEditor reservation={editing==="new"?null:editing} date={selectedDate} pending={pending} onClose={()=>setEditing(null)} onSubmit={submit} onCancel={cancel}/>} 
   </>;
 }

@@ -13,7 +13,7 @@ export default async function AdminPage() {
   if(!isStaff) redirect("/admin/login?error=permission");
   const{data}=await supabase.from("reservations")
     .select("id,reservation_date,start_time,duration_minutes,customer_name,phone,email,note,adults,children,infants,parking,source,status")
-    .neq("status","CANCELLED").order("reservation_date").order("start_time");
+    .order("reservation_date").order("start_time");
   const reservations=(data??[]).map(r=>({id:r.id,date:r.reservation_date,time:r.start_time.slice(0,5),minutes:r.duration_minutes,
     name:r.customer_name,phone:r.phone,email:r.email??"",note:r.note??"",adults:r.adults,children:r.children,
     infants:r.infants,guests:r.adults+r.children+r.infants,parking:r.parking,source:r.source,status:r.status}));
