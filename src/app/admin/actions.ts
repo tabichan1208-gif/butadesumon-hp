@@ -138,7 +138,7 @@ export async function uploadLibraryImage(formData:FormData):Promise<ActionResult
 
 export async function chooseSiteImage(formData:FormData):Promise<ActionResult>{
   const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
-  const slot=text(formData,"slot"),path=text(formData,"path");if(!["hero","about"].includes(slot)||!path)return{ok:false,message:"写真と表示場所を選択してください。"};
-  const column=slot==="hero"?"hero_image_path":"about_image_path";const{error}=await supabase.from("site_settings").update({[column]:path}).eq("id",true);
+  const slot=text(formData,"slot"),path=text(formData,"path");if(!["hero","hero_mobile","about"].includes(slot)||!path)return{ok:false,message:"写真と表示場所を選択してください。"};
+  const column=slot==="hero"?"hero_image_path":slot==="hero_mobile"?"hero_mobile_image_path":"about_image_path";const{error}=await supabase.from("site_settings").update({[column]:path}).eq("id",true);
   if(error)return{ok:false,message:"写真を設定できませんでした。"};revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"公開サイトの写真を変更しました。"};
 }

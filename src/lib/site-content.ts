@@ -2,7 +2,7 @@ export type SiteSettings = {
   store_name:string; tagline:string; business_hours:string; closed_days:string; address:string; phone:string;
   parking_capacity:number; primary_color:string; background_color:string; font_family:string; base_font_size:number;
   heading_font_family:string; heading_font_size:number; eyebrow_font_size:number;
-  hero_image_path:string; about_image_path:string; map_url:string;
+  hero_image_path:string; hero_mobile_image_path:string; about_image_path:string; map_url:string;
 };
 
 export type SiteCopy = Record<string,{heading:string;body:string}>;
@@ -10,7 +10,7 @@ export type SiteCopy = Record<string,{heading:string;body:string}>;
 export const defaultSettings:SiteSettings={
   store_name:"豚ですもん。",tagline:"こぶたと過ごす、やさしい時間。",business_hours:"11:00〜18:00",closed_days:"毎週月曜日",
   address:"愛知県安城市",phone:"",parking_capacity:1,primary_color:"#87533f",background_color:"#fbf7f1",font_family:"gothic",base_font_size:16,
-  heading_font_family:"serif",heading_font_size:48,eyebrow_font_size:11,hero_image_path:"",about_image_path:"",map_url:""
+  heading_font_family:"serif",heading_font_size:48,eyebrow_font_size:11,hero_image_path:"",hero_mobile_image_path:"",about_image_path:"",map_url:""
 };
 
 export const defaultCopy:SiteCopy={
