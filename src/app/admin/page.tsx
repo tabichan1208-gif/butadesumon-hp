@@ -9,8 +9,8 @@ export default async function AdminPage() {
   const{data:{user}}=await supabase.auth.getUser();
   const id=user?.id;
   if(!id) redirect("/admin/login");
-  const{data:profile}=await supabase.from("profiles").select("role").eq("id",id).single();
-  if(!profile||!["STAFF","ADMIN"].includes(profile.role)) redirect("/admin/login?error=permission");
+  const{data:isStaff}=await supabase.rpc("is_staff");
+  if(!isStaff) redirect("/admin/login?error=permission");
   const{data}=await supabase.from("reservations").select("start_time,duration_minutes,customer_name,adults,children,infants,parking,source").neq("status","CANCELLED").order("start_time");
   const reservations=(data??[]).map(r=>({time:r.start_time.slice(0,5),minutes:r.duration_minutes,name:r.customer_name,guests:r.adults+r.children+r.infants,parking:r.parking,source:r.source}));
   return <AdminDashboard reservations={reservations}/>;
