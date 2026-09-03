@@ -127,8 +127,13 @@ export async function saveFaq(formData:FormData):Promise<ActionResult>{
 
 export async function uploadLibraryImage(formData:FormData):Promise<ActionResult>{
   const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
-  const file=formData.get("image");if(!(file instanceof File)||file.size===0)return{ok:false,message:"写真を選択してください。"};
-  const stored=await storeImage(supabase,file,"library");if(!stored.path)return{ok:false,message:stored.message};revalidatePath("/admin");return{ok:true,message:"画像ライブラリへ追加しました。"};
+  const files=formData.getAll("images").filter((item):item is File=>item instanceof File&&item.size>0);
+  if(files.length===0)return{ok:false,message:"写真を選択してください。"};
+  if(files.length>20)return{ok:false,message:"一度に追加できる写真は20枚までです。"};
+  if(files.some(file=>!file.type.startsWith("image/")||file.size>8*1024*1024))return{ok:false,message:"1枚あたり8MB以下の画像を選択してください。"};
+  const stored=await Promise.all(files.map(file=>storeImage(supabase,file,"library")));
+  const failed=stored.find(item=>!item.path);if(failed)return{ok:false,message:failed.message};
+  revalidatePath("/admin");return{ok:true,message:`${files.length}枚の画像をライブラリへ追加しました。`};
 }
 
 export async function chooseSiteImage(formData:FormData):Promise<ActionResult>{
