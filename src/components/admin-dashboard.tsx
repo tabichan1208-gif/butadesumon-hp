@@ -4,7 +4,7 @@ import { FormEvent, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { cancelReservation, saveReservation, saveSiteCopy, saveSiteSettings, uploadSiteImage } from "@/app/admin/actions";
+import { cancelReservation, chooseSiteImage, saveFaq, savePig, saveReservation, saveSiteCopy, saveSiteSettings, uploadLibraryImage, uploadSiteImage } from "@/app/admin/actions";
 import type { SiteCopy, SiteSettings } from "@/lib/site-content";
 import { publicImageUrl } from "@/lib/site-content";
 
@@ -15,16 +15,19 @@ export type AdminReservation = {
   id:string; date:string; time:string; minutes:number; name:string; phone:string; email:string; note:string;
   adults:number; children:number; infants:number; guests:number; parking:boolean; source:string; status:string;
 };
+export type AdminPig={id:string;name:string;breed:string;bio:string|null;image_path:string|null;sort_order:number;published:boolean};
+export type AdminFaq={id:string;question:string;answer:string;sort_order:number;published:boolean};
+export type AdminMedia={id:string;storage_path:string;alt_text:string|null;created_at:string};
 
 function localDateString(date = new Date()) {
   const offset = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - offset).toISOString().slice(0,10);
 }
 
-export function AdminDashboard({reservations,settings,copy}:{reservations:AdminReservation[];settings:SiteSettings;copy:SiteCopy}) {
+export function AdminDashboard({reservations,settings,copy,pigs,faqs,media}:{reservations:AdminReservation[];settings:SiteSettings;copy:SiteCopy;pigs:AdminPig[];faqs:AdminFaq[];media:AdminMedia[]}) {
   const [active,setActive]=useState("予約管理");
   const logout=async()=>{await createClient().auth.signOut();location.href="/admin/login"};
-  const content=active==="予約管理"?<ReservationPanel reservations={reservations}/>:active==="サイト編集"?<SiteCopyEditor copy={copy} settings={settings}/>:active==="店舗情報"?<StoreSettingsEditor settings={settings}/>:<EditorPlaceholder title={active}/>;
+  const content=active==="予約管理"?<ReservationPanel reservations={reservations}/>:active==="サイト編集"?<SiteCopyEditor copy={copy} settings={settings}/>:active==="店舗情報"?<StoreSettingsEditor settings={settings}/>:active==="こぶた紹介"?<PigEditor pigs={pigs}/>:active==="よくある質問"?<FaqEditor faqs={faqs}/>:active==="画像ライブラリ"?<MediaLibrary media={media}/>:<EditorPlaceholder title={active}/>;
   return <div className="admin-shell"><aside><div className="admin-brand"><span>MICRO PIG CAFE</span>豚ですもん。<small>管理画面</small></div><nav>{menu.map((m,i)=><button className={active===m?"active":""} onClick={()=>setActive(m)} key={m}><span>{["▦","✎","⌂","♡","?","▧","⌕"][i]}</span>{m}</button>)}</nav><Link href="/">← 公開サイトを見る</Link><button className="logout" onClick={logout}>ログアウト</button></aside><section className="admin-main"><header><div><p>店舗運営</p><h1>{active}</h1></div><div className="admin-user"><span>豚</span><div><b>店舗管理者</b><small>ログイン中</small></div></div></header>{content}</section></div>;
 }
 
@@ -74,5 +77,29 @@ function StoreSettingsEditor({settings}:{settings:SiteSettings}){
   const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");
   const submit=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const data=new FormData(e.currentTarget);startTransition(async()=>{const result=await saveSiteSettings(data);setNotice(result.message);if(result.ok)router.refresh()})};
   return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<form className="admin-panel cms-form" onSubmit={submit}><div className="panel-head"><div><h2>店舗情報</h2><p>公開サイトの店舗情報へ反映されます</p></div><button className="button" disabled={pending}>{pending?"保存中…":"変更を保存"}</button></div><div className="settings-fields"><label>店名<input name="store_name" defaultValue={settings.store_name} required/></label><label>キャッチコピー<input name="tagline" defaultValue={settings.tagline}/></label><label>営業時間<input name="business_hours" defaultValue={settings.business_hours}/></label><label>定休日<input name="closed_days" defaultValue={settings.closed_days}/></label><label>住所<input name="address" defaultValue={settings.address}/></label><label>電話番号<input name="phone" defaultValue={settings.phone}/></label><label className="wide">GoogleマップURL<input name="map_url" type="url" defaultValue={settings.map_url}/></label></div><hr/><div className="panel-head"><div><h2>フォントと色</h2><p>サイト全体・見出し・英字見出しを調整できます</p></div></div><div className="settings-fields"><label>本文フォント<select name="font_family" defaultValue={settings.font_family}><option value="gothic">ゴシック体</option><option value="serif">明朝体</option><option value="rounded">丸ゴシック体</option></select></label><label>本文サイズ<input name="base_font_size" type="number" min="12" max="24" defaultValue={settings.base_font_size}/></label><label>見出しフォント<select name="heading_font_family" defaultValue={settings.heading_font_family}><option value="serif">明朝体</option><option value="gothic">ゴシック体</option><option value="rounded">丸ゴシック体</option></select></label><label>見出しサイズ<input name="heading_font_size" type="number" min="24" max="80" defaultValue={settings.heading_font_size}/></label><label>英字見出しサイズ<input name="eyebrow_font_size" type="number" min="8" max="20" defaultValue={settings.eyebrow_font_size}/></label><label>メインカラー<input name="primary_color" type="color" defaultValue={settings.primary_color}/></label><label>背景色<input name="background_color" type="color" defaultValue={settings.background_color}/></label></div><button className="button cms-save" disabled={pending}>変更を保存</button></form></div>;
+}
+
+function PigEditor({pigs}:{pigs:AdminPig[]}){
+  const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");
+  const submit=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);startTransition(async()=>{const result=await savePig(data);setNotice(result.message);if(result.ok){if(!data.get("id"))form.reset();router.refresh()}})};
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<section className="admin-panel"><div className="panel-head"><div><h2>こぶた紹介</h2><p>表示順が小さい順に公開サイトへ並びます</p></div></div><div className="manager-list"><PigForm onSubmit={submit} pending={pending}/>{pigs.map(pig=><PigForm key={pig.id} pig={pig} onSubmit={submit} pending={pending}/>)}</div></section></div>;
+}
+function PigForm({pig,onSubmit,pending}:{pig?:AdminPig;onSubmit:(e:FormEvent<HTMLFormElement>)=>void;pending:boolean}){
+  return <form className="manager-card" onSubmit={onSubmit}><div className="manager-thumb" style={pig?.image_path?{backgroundImage:`url(${publicImageUrl(pig.image_path)})`}:undefined}>{!pig?.image_path&&"🐽"}</div><div className="manager-fields"><input type="hidden" name="id" value={pig?.id??""}/><input type="hidden" name="image_path" value={pig?.image_path??""}/><label>名前<input name="name" defaultValue={pig?.name??""} required placeholder="例：チョコ"/></label><label>種類・紹介見出し<input name="breed" defaultValue={pig?.breed??"マイクロブタ"}/></label><label>紹介文<textarea name="bio" rows={2} defaultValue={pig?.bio??""}/></label><label>写真<input name="image" type="file" accept="image/jpeg,image/png,image/webp"/></label><label>表示順<input name="sort_order" type="number" defaultValue={pig?.sort_order??0}/></label><label className="publish-check"><input name="published" type="checkbox" defaultChecked={pig?.published??true}/> 公開する</label></div><button className="button" disabled={pending}>{pig?"変更を保存":"＋ 追加する"}</button></form>;
+}
+
+function FaqEditor({faqs}:{faqs:AdminFaq[]}){
+  const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");
+  const submit=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);startTransition(async()=>{const result=await saveFaq(data);setNotice(result.message);if(result.ok){if(!data.get("id"))form.reset();router.refresh()}})};
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<section className="admin-panel"><div className="panel-head"><div><h2>よくある質問</h2><p>質問の追加・編集・公開切り替えができます</p></div></div><div className="manager-list"><FaqForm onSubmit={submit} pending={pending}/>{faqs.map(faq=><FaqForm key={faq.id} faq={faq} onSubmit={submit} pending={pending}/>)}</div></section></div>;
+}
+function FaqForm({faq,onSubmit,pending}:{faq?:AdminFaq;onSubmit:(e:FormEvent<HTMLFormElement>)=>void;pending:boolean}){
+  return <form className="manager-card faq-manager" onSubmit={onSubmit}><div className="manager-fields"><input type="hidden" name="id" value={faq?.id??""}/><label>質問<input name="question" defaultValue={faq?.question??""} required placeholder="例：予約なしでも入れますか？"/></label><label>回答<textarea name="answer" rows={3} defaultValue={faq?.answer??""} required/></label><label>表示順<input name="sort_order" type="number" defaultValue={faq?.sort_order??0}/></label><label className="publish-check"><input name="published" type="checkbox" defaultChecked={faq?.published??true}/> 公開する</label></div><button className="button" disabled={pending}>{faq?"変更を保存":"＋ 追加する"}</button></form>;
+}
+
+function MediaLibrary({media}:{media:AdminMedia[]}){
+  const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");
+  const run=(action:(data:FormData)=>Promise<{ok:boolean;message:string}>)=>(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);startTransition(async()=>{const result=await action(data);setNotice(result.message);if(result.ok){form.reset();router.refresh()}})};
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<section className="admin-panel"><div className="panel-head"><div><h2>画像ライブラリ</h2><p>登録済み画像をメイン写真や店舗紹介写真に使えます</p></div></div><form className="library-upload" onSubmit={run(uploadLibraryImage)}><input name="image" type="file" accept="image/jpeg,image/png,image/webp" required/><button className="button" disabled={pending}>画像を追加</button></form><div className="media-grid">{media.length===0?<p className="empty-state">画像はまだありません。</p>:media.map(item=><article key={item.id}><div className="media-photo" style={{backgroundImage:`url(${publicImageUrl(item.storage_path)})`}}/><p>{item.alt_text||"登録画像"}</p><form onSubmit={run(chooseSiteImage)}><input type="hidden" name="path" value={item.storage_path}/><select name="slot" defaultValue="hero"><option value="hero">メイン写真</option><option value="about">店舗紹介写真</option></select><button className="button secondary" disabled={pending}>この画像を使う</button></form></article>)}</div></section></div>;
 }
 function EditorPlaceholder({title}:{title:string}) { return <div className="admin-panel editor"><div><span className="editor-icon">✎</span><h2>{title}</h2><p>次の開発段階で、ここからコードを触らずに内容を編集できるようにします。</p></div><div className="settings-preview"><label>ページ見出し<input defaultValue={title}/></label><label>表示設定<select><option>公開</option><option>非公開</option></select></label><label>説明文<textarea defaultValue="店舗の情報をここから編集できます。" rows={5}/></label><div><button className="button secondary">プレビュー</button><button className="button">変更を保存</button></div></div></div> }

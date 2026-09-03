@@ -91,9 +91,49 @@ export async function uploadSiteImage(formData:FormData):Promise<ActionResult>{
   const path=`${slot}/${Date.now()}.${extension}`;
   const{error:uploadError}=await supabase.storage.from("site-media").upload(path,file,{contentType:file.type,upsert:false});
   if(uploadError)return{ok:false,message:"写真をアップロードできませんでした。"};
+  await supabase.from("media_assets").insert({storage_path:path,alt_text:file.name,mime_type:file.type,size_bytes:file.size});
   const column=slot==="hero"?"hero_image_path":"about_image_path";
   const{error}=await supabase.from("site_settings").update({[column]:path}).eq("id",true);
   if(error)return{ok:false,message:"写真の設定を保存できませんでした。"};
   revalidatePath("/");revalidatePath("/admin");
   return{ok:true,message:"写真を変更しました。"};
+}
+
+async function storeImage(supabase:Awaited<ReturnType<typeof createClient>>,file:File,folder:string){
+  if(!file.type.startsWith("image/")||file.size>8*1024*1024)return{path:"",message:"8MB以下の画像を選択してください。"};
+  const extension=(file.name.split(".").pop()||"jpg").replace(/[^a-zA-Z0-9]/g,"");
+  const path=`${folder}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${extension}`;
+  const{error}=await supabase.storage.from("site-media").upload(path,file,{contentType:file.type,upsert:false});
+  if(error)return{path:"",message:"写真をアップロードできませんでした。"};
+  await supabase.from("media_assets").insert({storage_path:path,alt_text:file.name,mime_type:file.type,size_bytes:file.size});
+  return{path,message:""};
+}
+
+export async function savePig(formData:FormData):Promise<ActionResult>{
+  const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const id=text(formData,"id");let imagePath=text(formData,"image_path");const file=formData.get("image");
+  if(file instanceof File&&file.size>0){const stored=await storeImage(supabase,file,"pigs");if(!stored.path)return{ok:false,message:stored.message};imagePath=stored.path}
+  const payload={name:text(formData,"name"),breed:text(formData,"breed")||"マイクロブタ",bio:text(formData,"bio")||null,image_path:imagePath||null,sort_order:Number(formData.get("sort_order"))||0,published:formData.get("published")==="on"};
+  const{error}=id?await supabase.from("pigs").update(payload).eq("id",id):await supabase.from("pigs").insert(payload);
+  if(error)return{ok:false,message:"こぶた情報を保存できませんでした。"};revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"こぶた情報を保存しました。"};
+}
+
+export async function saveFaq(formData:FormData):Promise<ActionResult>{
+  const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const id=text(formData,"id");const payload={question:text(formData,"question"),answer:text(formData,"answer"),sort_order:Number(formData.get("sort_order"))||0,published:formData.get("published")==="on"};
+  const{error}=id?await supabase.from("faqs").update(payload).eq("id",id):await supabase.from("faqs").insert(payload);
+  if(error)return{ok:false,message:"よくある質問を保存できませんでした。"};revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"よくある質問を保存しました。"};
+}
+
+export async function uploadLibraryImage(formData:FormData):Promise<ActionResult>{
+  const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const file=formData.get("image");if(!(file instanceof File)||file.size===0)return{ok:false,message:"写真を選択してください。"};
+  const stored=await storeImage(supabase,file,"library");if(!stored.path)return{ok:false,message:stored.message};revalidatePath("/admin");return{ok:true,message:"画像ライブラリへ追加しました。"};
+}
+
+export async function chooseSiteImage(formData:FormData):Promise<ActionResult>{
+  const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const slot=text(formData,"slot"),path=text(formData,"path");if(!["hero","about"].includes(slot)||!path)return{ok:false,message:"写真と表示場所を選択してください。"};
+  const column=slot==="hero"?"hero_image_path":"about_image_path";const{error}=await supabase.from("site_settings").update({[column]:path}).eq("id",true);
+  if(error)return{ok:false,message:"写真を設定できませんでした。"};revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"公開サイトの写真を変更しました。"};
 }

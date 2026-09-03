@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { ReservationForm } from "@/components/reservation-form";
 import { SiteHeader } from "@/components/site-header";
-import { faqs, pigs as fallbackPigs } from "@/lib/mock-data";
+import { faqs as fallbackFaqs, pigs as fallbackPigs } from "@/lib/mock-data";
 import { createClient } from "@/lib/supabase/server";
 import { defaultCopy, defaultSettings, publicImageUrl } from "@/lib/site-content";
 
@@ -9,14 +9,16 @@ const fontMap={gothic:'"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif',serif
 
 export default async function Home(){
   const supabase=await createClient();
-  const[{data:settingsData},{data:contentData},{data:pigData}]=await Promise.all([
+  const[{data:settingsData},{data:contentData},{data:pigData},{data:faqData}]=await Promise.all([
     supabase.from("site_settings").select("*").eq("id",true).maybeSingle(),
     supabase.from("site_content").select("section_key,heading,body").eq("published",true),
-    supabase.from("pigs").select("id,name,breed,bio,image_path").eq("published",true).order("sort_order")
+    supabase.from("pigs").select("id,name,breed,bio,image_path").eq("published",true).order("sort_order"),
+    supabase.from("faqs").select("id,question,answer").eq("published",true).order("sort_order")
   ]);
   const settings={...defaultSettings,...settingsData,phone:settingsData?.phone??"",hero_image_path:settingsData?.hero_image_path??"",about_image_path:settingsData?.about_image_path??"",map_url:settingsData?.map_url??""};
   const copy={...defaultCopy};for(const row of contentData??[])copy[row.section_key]={heading:normalizeBreaks(row.heading??""),body:normalizeBreaks(row.body??"")};
   const pigs=pigData?.length?pigData:fallbackPigs.map(p=>({...p,image_path:""}));
+  const faqs=faqData?.length?faqData.map(item=>[item.question,item.answer] as const):fallbackFaqs;
   const style={"--rose":settings.primary_color,"--cream":settings.background_color,"--site-font":fontMap[settings.font_family as keyof typeof fontMap]??fontMap.gothic,"--heading-font":fontMap[settings.heading_font_family as keyof typeof fontMap]??fontMap.serif,"--base-size":`${settings.base_font_size}px`,"--heading-size":`${settings.heading_font_size}px`,"--eyebrow-size":`${settings.eyebrow_font_size}px`} as CSSProperties;
   const heroImage=publicImageUrl(settings.hero_image_path),aboutImage=publicImageUrl(settings.about_image_path);
   return <main className="public-site" style={style}>
