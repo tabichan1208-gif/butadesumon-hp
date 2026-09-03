@@ -1,0 +1,6 @@
+"use client";
+import { FormEvent,useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+export function AdminLogin(){const router=useRouter();const[error,setError]=useState("");const[loading,setLoading]=useState(false);async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();setLoading(true);setError("");const d=new FormData(e.currentTarget);const{error}=await createClient().auth.signInWithPassword({email:String(d.get("email")),password:String(d.get("password"))});setLoading(false);if(error)return setError("メールアドレスまたはパスワードが正しくありません。");router.replace("/admin");router.refresh()}return <main className="login-page"><form className="login-card" onSubmit={submit}><div className="logo"><span>MICRO PIG CAFE</span>豚ですもん。</div><p>店舗管理画面</p><h1>ログイン</h1><label>メールアドレス<input name="email" type="email" required autoComplete="email"/></label><label>パスワード<input name="password" type="password" required autoComplete="current-password"/></label>{error&&<p className="error">{error}</p>}<button className="button full" disabled={loading}>{loading?"確認中…":"ログイン"}</button><Link href="/">← 公開サイトへ戻る</Link></form></main>}
