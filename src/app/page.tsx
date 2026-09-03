@@ -15,7 +15,7 @@ export default async function Home(){
     supabase.from("pigs").select("id,name,breed,bio,image_path").eq("published",true).order("sort_order")
   ]);
   const settings={...defaultSettings,...settingsData,phone:settingsData?.phone??"",hero_image_path:settingsData?.hero_image_path??"",about_image_path:settingsData?.about_image_path??"",map_url:settingsData?.map_url??""};
-  const copy={...defaultCopy};for(const row of contentData??[])copy[row.section_key]={heading:row.heading??"",body:row.body??""};
+  const copy={...defaultCopy};for(const row of contentData??[])copy[row.section_key]={heading:normalizeBreaks(row.heading??""),body:normalizeBreaks(row.body??"")};
   const pigs=pigData?.length?pigData:fallbackPigs.map(p=>({...p,image_path:""}));
   const style={"--rose":settings.primary_color,"--cream":settings.background_color,"--site-font":fontMap[settings.font_family as keyof typeof fontMap]??fontMap.gothic,"--heading-font":fontMap[settings.heading_font_family as keyof typeof fontMap]??fontMap.serif,"--base-size":`${settings.base_font_size}px`,"--heading-size":`${settings.heading_font_size}px`,"--eyebrow-size":`${settings.eyebrow_font_size}px`} as CSSProperties;
   const heroImage=publicImageUrl(settings.hero_image_path),aboutImage=publicImageUrl(settings.about_image_path);
@@ -33,3 +33,4 @@ export default async function Home(){
 }
 
 function lines(value:string){const parts=value.split("\n");return parts.map((line,index)=><span key={`${line}-${index}`}>{line}{index<parts.length-1&&<br/>}</span>)}
+function normalizeBreaks(value:string){return value.replace(/\\n/g,"\n")}

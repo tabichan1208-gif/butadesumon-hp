@@ -22,6 +22,6 @@ export default async function AdminPage() {
     infants:r.infants,guests:r.adults+r.children+r.infants,parking:r.parking,source:r.source,status:r.status}));
   const settings={...defaultSettings,...settingsData,phone:settingsData?.phone??"",hero_image_path:settingsData?.hero_image_path??"",about_image_path:settingsData?.about_image_path??"",map_url:settingsData?.map_url??""};
   const copy={...defaultCopy};
-  for(const row of contentData??[])copy[row.section_key]={heading:row.heading??"",body:row.body??""};
+  for(const row of contentData??[])copy[row.section_key]={heading:(row.heading??"").replace(/\\n/g,"\n"),body:(row.body??"").replace(/\\n/g,"\n")};
   return <AdminDashboard reservations={reservations} settings={settings} copy={copy}/>;
 }
