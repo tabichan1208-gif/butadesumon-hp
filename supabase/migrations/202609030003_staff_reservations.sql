@@ -51,3 +51,5 @@ $$;
 
 revoke all on function public.upsert_staff_reservation(date,time,integer,integer,integer,integer,boolean,text,text,text,text,public.reservation_source,uuid) from public;
 grant execute on function public.upsert_staff_reservation(date,time,integer,integer,integer,integer,boolean,text,text,text,text,public.reservation_source,uuid) to authenticated;
+grant select on table public.site_settings to authenticated;
+grant select, insert, update on table public.reservations to authenticated;
