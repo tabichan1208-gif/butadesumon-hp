@@ -4,9 +4,11 @@ import { FormEvent, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { cancelReservation, saveReservation } from "@/app/admin/actions";
+import { cancelReservation, saveReservation, saveSiteCopy, saveSiteSettings, uploadSiteImage } from "@/app/admin/actions";
+import type { SiteCopy, SiteSettings } from "@/lib/site-content";
+import { publicImageUrl } from "@/lib/site-content";
 
-const menu = ["予約管理","サイト編集","こぶた紹介","よくある質問","画像ライブラリ","SEO設定"];
+const menu = ["予約管理","サイト編集","店舗情報","こぶた紹介","よくある質問","画像ライブラリ","SEO設定"];
 const sourceLabels: Record<string,string> = { WEB:"WEB", PHONE:"電話", WALK_IN:"店頭", OTHER:"その他" };
 
 export type AdminReservation = {
@@ -19,10 +21,11 @@ function localDateString(date = new Date()) {
   return new Date(date.getTime() - offset).toISOString().slice(0,10);
 }
 
-export function AdminDashboard({reservations}:{reservations:AdminReservation[]}) {
+export function AdminDashboard({reservations,settings,copy}:{reservations:AdminReservation[];settings:SiteSettings;copy:SiteCopy}) {
   const [active,setActive]=useState("予約管理");
   const logout=async()=>{await createClient().auth.signOut();location.href="/admin/login"};
-  return <div className="admin-shell"><aside><div className="admin-brand"><span>MICRO PIG CAFE</span>豚ですもん。<small>管理画面</small></div><nav>{menu.map((m,i)=><button className={active===m?"active":""} onClick={()=>setActive(m)} key={m}><span>{["▦","✎","♡","?","▧","⌕"][i]}</span>{m}</button>)}</nav><Link href="/">← 公開サイトを見る</Link><button className="logout" onClick={logout}>ログアウト</button></aside><section className="admin-main"><header><div><p>店舗運営</p><h1>{active}</h1></div><div className="admin-user"><span>豚</span><div><b>店舗管理者</b><small>ログイン中</small></div></div></header>{active==="予約管理"?<ReservationPanel reservations={reservations}/>:<EditorPlaceholder title={active}/>}</section></div>;
+  const content=active==="予約管理"?<ReservationPanel reservations={reservations}/>:active==="サイト編集"?<SiteCopyEditor copy={copy} settings={settings}/>:active==="店舗情報"?<StoreSettingsEditor settings={settings}/>:<EditorPlaceholder title={active}/>;
+  return <div className="admin-shell"><aside><div className="admin-brand"><span>MICRO PIG CAFE</span>豚ですもん。<small>管理画面</small></div><nav>{menu.map((m,i)=><button className={active===m?"active":""} onClick={()=>setActive(m)} key={m}><span>{["▦","✎","⌂","♡","?","▧","⌕"][i]}</span>{m}</button>)}</nav><Link href="/">← 公開サイトを見る</Link><button className="logout" onClick={logout}>ログアウト</button></aside><section className="admin-main"><header><div><p>店舗運営</p><h1>{active}</h1></div><div className="admin-user"><span>豚</span><div><b>店舗管理者</b><small>ログイン中</small></div></div></header>{content}</section></div>;
 }
 
 function ReservationPanel({reservations}:{reservations:AdminReservation[]}) {
@@ -56,4 +59,20 @@ function Timeline({reservations}:{reservations:AdminReservation[]}) { const slot
 
 function timeline(reservations:AdminReservation[]){if(!reservations.length)return[];const toMinutes=(t:string)=>{const[h,m]=t.split(":").map(Number);return h*60+m};const start=Math.min(...reservations.map(r=>toMinutes(r.time)));const end=Math.max(...reservations.map(r=>toMinutes(r.time)+r.minutes));const slots=[];for(let minute=Math.floor(start/15)*15;minute<end;minute+=15){const current=reservations.filter(r=>{const s=toMinutes(r.time);return s<=minute&&s+r.minutes>minute});slots.push({time:`${String(Math.floor(minute/60)).padStart(2,"0")}:${String(minute%60).padStart(2,"0")}`,guests:current.reduce((n,r)=>n+r.guests,0),parking:current.some(r=>r.parking)})}return slots}
 function formatDate(value:string){const[y,m,d]=value.split("-");return `${y}年${Number(m)}月${Number(d)}日`}
+function SiteCopyEditor({copy,settings}:{copy:SiteCopy;settings:SiteSettings}){
+  const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");
+  const submit=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const data=new FormData(e.currentTarget);startTransition(async()=>{const result=await saveSiteCopy(data);setNotice(result.message);if(result.ok)router.refresh()})};
+  const upload=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const data=new FormData(e.currentTarget);startTransition(async()=>{const result=await uploadSiteImage(data);setNotice(result.message);if(result.ok)router.refresh()})};
+  const sections=[
+    ["hero","メインビジュアル"],["about","店舗紹介"],["friends","こぶた紹介"],["guide_reservation","利用案内・予約"],
+    ["guide_parking","利用案内・駐車場"],["guide_access","利用案内・アクセス"],["reservation","予約セクション"],["footer","フッター"]
+  ];
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<section className="admin-panel"><div className="panel-head"><div><h2>写真を変更</h2><p>JPG・PNG・WebP、8MB以下</p></div></div><div className="image-edit-grid">{([['hero','メイン写真',settings.hero_image_path],['about','店舗紹介写真',settings.about_image_path]] as const).map(([slot,label,path])=><form key={slot} onSubmit={upload}><div className="image-preview" style={path?{backgroundImage:`url(${publicImageUrl(path)})`}:undefined}>{!path&&"写真未設定"}</div><b>{label}</b><input type="hidden" name="slot" value={slot}/><input type="file" name="image" accept="image/jpeg,image/png,image/webp" required/><button className="button" disabled={pending}>写真を変更</button></form>)}</div></section><form className="admin-panel cms-form" onSubmit={submit}><div className="panel-head"><div><h2>各セクションの文章</h2><p>改行も公開サイトへ反映されます</p></div><button className="button" disabled={pending}>{pending?"保存中…":"文章を保存"}</button></div><div className="copy-edit-grid">{sections.map(([key,label])=><fieldset key={key}><legend>{label}</legend><label>見出し<input name={`${key}_heading`} defaultValue={copy[key]?.heading??""}/></label><label>文章<textarea name={`${key}_body`} rows={4} defaultValue={copy[key]?.body??""}/></label></fieldset>)}</div><button className="button cms-save" disabled={pending}>文章を保存</button></form></div>;
+}
+
+function StoreSettingsEditor({settings}:{settings:SiteSettings}){
+  const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");
+  const submit=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const data=new FormData(e.currentTarget);startTransition(async()=>{const result=await saveSiteSettings(data);setNotice(result.message);if(result.ok)router.refresh()})};
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<form className="admin-panel cms-form" onSubmit={submit}><div className="panel-head"><div><h2>店舗情報</h2><p>公開サイトの店舗情報へ反映されます</p></div><button className="button" disabled={pending}>{pending?"保存中…":"変更を保存"}</button></div><div className="settings-fields"><label>店名<input name="store_name" defaultValue={settings.store_name} required/></label><label>キャッチコピー<input name="tagline" defaultValue={settings.tagline}/></label><label>営業時間<input name="business_hours" defaultValue={settings.business_hours}/></label><label>定休日<input name="closed_days" defaultValue={settings.closed_days}/></label><label>住所<input name="address" defaultValue={settings.address}/></label><label>電話番号<input name="phone" defaultValue={settings.phone}/></label><label className="wide">GoogleマップURL<input name="map_url" type="url" defaultValue={settings.map_url}/></label></div><hr/><div className="panel-head"><div><h2>フォントと色</h2><p>サイト全体・見出し・英字見出しを調整できます</p></div></div><div className="settings-fields"><label>本文フォント<select name="font_family" defaultValue={settings.font_family}><option value="gothic">ゴシック体</option><option value="serif">明朝体</option><option value="rounded">丸ゴシック体</option></select></label><label>本文サイズ<input name="base_font_size" type="number" min="12" max="24" defaultValue={settings.base_font_size}/></label><label>見出しフォント<select name="heading_font_family" defaultValue={settings.heading_font_family}><option value="serif">明朝体</option><option value="gothic">ゴシック体</option><option value="rounded">丸ゴシック体</option></select></label><label>見出しサイズ<input name="heading_font_size" type="number" min="24" max="80" defaultValue={settings.heading_font_size}/></label><label>英字見出しサイズ<input name="eyebrow_font_size" type="number" min="8" max="20" defaultValue={settings.eyebrow_font_size}/></label><label>メインカラー<input name="primary_color" type="color" defaultValue={settings.primary_color}/></label><label>背景色<input name="background_color" type="color" defaultValue={settings.background_color}/></label></div><button className="button cms-save" disabled={pending}>変更を保存</button></form></div>;
+}
 function EditorPlaceholder({title}:{title:string}) { return <div className="admin-panel editor"><div><span className="editor-icon">✎</span><h2>{title}</h2><p>次の開発段階で、ここからコードを触らずに内容を編集できるようにします。</p></div><div className="settings-preview"><label>ページ見出し<input defaultValue={title}/></label><label>表示設定<select><option>公開</option><option>非公開</option></select></label><label>説明文<textarea defaultValue="店舗の情報をここから編集できます。" rows={5}/></label><div><button className="button secondary">プレビュー</button><button className="button">変更を保存</button></div></div></div> }

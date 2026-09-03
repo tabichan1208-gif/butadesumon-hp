@@ -50,3 +50,50 @@ export async function cancelReservation(id: string): Promise<ActionResult> {
   revalidatePath("/admin");
   return { ok: true, message: "予約をキャンセルしました。" };
 }
+
+export async function saveSiteSettings(formData:FormData):Promise<ActionResult>{
+  const supabase=await getStaffClient();
+  if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const payload={
+    store_name:text(formData,"store_name"),tagline:text(formData,"tagline"),business_hours:text(formData,"business_hours"),
+    closed_days:text(formData,"closed_days"),address:text(formData,"address"),phone:text(formData,"phone")||null,
+    map_url:text(formData,"map_url")||null,primary_color:text(formData,"primary_color"),background_color:text(formData,"background_color"),
+    font_family:text(formData,"font_family"),base_font_size:Number(formData.get("base_font_size")),
+    heading_font_family:text(formData,"heading_font_family"),heading_font_size:Number(formData.get("heading_font_size")),
+    eyebrow_font_size:Number(formData.get("eyebrow_font_size")),
+  };
+  const{error}=await supabase.from("site_settings").update(payload).eq("id",true);
+  if(error)return{ok:false,message:"店舗・デザイン設定を保存できませんでした。"};
+  revalidatePath("/");revalidatePath("/admin");
+  return{ok:true,message:"店舗・デザイン設定を保存しました。"};
+}
+
+export async function saveSiteCopy(formData:FormData):Promise<ActionResult>{
+  const supabase=await getStaffClient();
+  if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const keys=["hero","about","friends","guide_reservation","guide_parking","guide_access","reservation","footer"];
+  const rows=keys.map((section_key,index)=>({section_key,heading:text(formData,`${section_key}_heading`),body:text(formData,`${section_key}_body`),sort_order:(index+1)*10,published:true}));
+  const{error}=await supabase.from("site_content").upsert(rows,{onConflict:"section_key"});
+  if(error)return{ok:false,message:"文章を保存できませんでした。"};
+  revalidatePath("/");revalidatePath("/admin");
+  return{ok:true,message:"サイトの文章を保存しました。"};
+}
+
+export async function uploadSiteImage(formData:FormData):Promise<ActionResult>{
+  const supabase=await getStaffClient();
+  if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const slot=text(formData,"slot");
+  if(!["hero","about"].includes(slot))return{ok:false,message:"写真の場所を確認してください。"};
+  const file=formData.get("image");
+  if(!(file instanceof File)||file.size===0)return{ok:false,message:"写真を選択してください。"};
+  if(!file.type.startsWith("image/")||file.size>8*1024*1024)return{ok:false,message:"8MB以下の画像を選択してください。"};
+  const extension=(file.name.split(".").pop()||"jpg").replace(/[^a-zA-Z0-9]/g,"");
+  const path=`${slot}/${Date.now()}.${extension}`;
+  const{error:uploadError}=await supabase.storage.from("site-media").upload(path,file,{contentType:file.type,upsert:false});
+  if(uploadError)return{ok:false,message:"写真をアップロードできませんでした。"};
+  const column=slot==="hero"?"hero_image_path":"about_image_path";
+  const{error}=await supabase.from("site_settings").update({[column]:path}).eq("id",true);
+  if(error)return{ok:false,message:"写真の設定を保存できませんでした。"};
+  revalidatePath("/");revalidatePath("/admin");
+  return{ok:true,message:"写真を変更しました。"};
+}

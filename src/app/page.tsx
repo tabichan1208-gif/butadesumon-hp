@@ -1,22 +1,35 @@
+import type { CSSProperties } from "react";
 import { ReservationForm } from "@/components/reservation-form";
 import { SiteHeader } from "@/components/site-header";
-import { faqs, pigs } from "@/lib/mock-data";
+import { faqs, pigs as fallbackPigs } from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/server";
+import { defaultCopy, defaultSettings, publicImageUrl } from "@/lib/site-content";
 
-export default function Home() {
-  return <main>
-    <SiteHeader />
-    <section className="hero"><div className="hero-copy"><p className="eyebrow">MICRO PIG CAFE · AICHI</p><h1>こぶたと過ごす、<br/><em>やさしい時間。</em></h1><p>小さな鼻と、あたたかな体温。<br/>日常をちょっと忘れて、のんびりしませんか。</p><div className="hero-actions"><a className="button" href="#reservation">ご予約はこちら</a><a className="text-link" href="#about">お店のことを知る →</a></div></div><div className="hero-art" aria-label="マイクロブタのイメージ"><div className="sun"/><div className="pig-shape"><span className="ear left"/><span className="ear right"/><span className="eye e1"/><span className="eye e2"/><span className="snout">•　•</span></div><p>のんびり、すやすや。</p></div><div className="scroll">SCROLL ↓</div></section>
+const fontMap={gothic:'"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif',serif:'"Yu Mincho","Hiragino Mincho ProN",serif',rounded:'"Hiragino Maru Gothic ProN","Yu Gothic",sans-serif'};
 
-    <section id="about" className="section about"><div><p className="eyebrow">ABOUT US</p><h2>ここは、こぶたが主役の<br/>小さなふれあいカフェ。</h2></div><div><p>「豚ですもん。」では、個性豊かなマイクロブタさんたちがのびのびと暮らしています。床に座って、同じ目線で、気ままな時間をお過ごしください。</p><div className="values"><span>01<small>少人数制</small></span><span>02<small>ゆったり予約</small></span><span>03<small>清潔な空間</small></span></div></div></section>
-
-    <section id="pigs" className="section tinted"><div className="section-heading"><p className="eyebrow">OUR PIGS</p><h2>会える、こぶたたち</h2><p>性格も好きなことも、みんなそれぞれ。</p></div><div className="pig-grid">{pigs.map((pig,i) => <article className="pig-card" key={pig.id}><div className="pig-photo" style={{backgroundColor:pig.color}}><div className="mini-pig">🐽</div><span>0{i+1}</span></div><div><p>{pig.breed}</p><h3>{pig.name}</h3><p>{pig.bio}</p></div></article>)}</div></section>
-
-    <section id="guide" className="section"><div className="section-heading"><p className="eyebrow">VISIT GUIDE</p><h2>ご利用案内</h2></div><div className="guide-grid"><article><b>01</b><h3>予約する</h3><p>日時・人数・利用時間を選んでご予約ください。</p></article><article><b>02</b><h3>お店へ</h3><p>ご予約時間の5分前を目安にお越しください。</p></article><article><b>03</b><h3>こぶたと過ごす</h3><p>スタッフの案内後、やさしく触れ合いましょう。</p></article></div><div className="price"><div><p className="eyebrow">PRICE</p><h3>料金のご案内</h3><p>料金は当日、店舗にてお支払いください。</p></div><table><thead><tr><th>年齢</th><th>15分</th><th>30分</th><th>45分</th><th>60分</th></tr></thead><tbody><tr><th>13歳以上</th><td>¥1,500</td><td>¥2,000</td><td>¥2,400</td><td>¥2,800</td></tr><tr><th>3〜12歳</th><td>¥1,000</td><td>¥1,500</td><td>¥1,800</td><td>¥2,200</td></tr><tr><th>2歳以下</th><td colSpan={4}>無料</td></tr></tbody></table></div></section>
-
-    <section id="reservation" className="section reservation"><div className="section-heading"><p className="eyebrow">ONLINE RESERVATION</p><h2>オンライン予約</h2><p>同時入店は最大8名。空き状況は予約時間の重なりを含めて確認します。</p></div><ReservationForm /></section>
-
-    <section id="faq" className="section faq"><div className="section-heading"><p className="eyebrow">FAQ</p><h2>よくある質問</h2></div><div>{faqs.map(([q,a],i) => <details key={q} open={i===0}><summary><span>Q.</span>{q}<b>＋</b></summary><p>{a}</p></details>)}</div></section>
-    <section className="section access"><div><p className="eyebrow">ACCESS</p><h2>店舗情報</h2><dl><dt>店名</dt><dd>マイクロブタカフェ 豚ですもん。</dd><dt>営業時間</dt><dd>10:00–17:00（最終受付 16:00）</dd><dt>定休日</dt><dd>火曜日・水曜日</dd><dt>駐車場</dt><dd>専用駐車場 1台（要予約）</dd><dt>住所</dt><dd>愛知県（正式住所は公開前に設定）</dd></dl></div><div className="map"><span>MAP</span><p>正式な住所を設定すると<br/>Google Mapを表示できます</p></div></section>
-    <footer><div className="logo"><span>MICRO PIG CAFE</span>豚ですもん。</div><p>こぶたと過ごす、やさしい時間。</p><small>© {new Date().getFullYear()} 豚ですもん。 All rights reserved.</small></footer>
+export default async function Home(){
+  const supabase=await createClient();
+  const[{data:settingsData},{data:contentData},{data:pigData}]=await Promise.all([
+    supabase.from("site_settings").select("*").eq("id",true).maybeSingle(),
+    supabase.from("site_content").select("section_key,heading,body").eq("published",true),
+    supabase.from("pigs").select("id,name,breed,bio,image_path").eq("published",true).order("sort_order")
+  ]);
+  const settings={...defaultSettings,...settingsData,phone:settingsData?.phone??"",hero_image_path:settingsData?.hero_image_path??"",about_image_path:settingsData?.about_image_path??"",map_url:settingsData?.map_url??""};
+  const copy={...defaultCopy};for(const row of contentData??[])copy[row.section_key]={heading:row.heading??"",body:row.body??""};
+  const pigs=pigData?.length?pigData:fallbackPigs.map(p=>({...p,image_path:""}));
+  const style={"--rose":settings.primary_color,"--cream":settings.background_color,"--site-font":fontMap[settings.font_family as keyof typeof fontMap]??fontMap.gothic,"--heading-font":fontMap[settings.heading_font_family as keyof typeof fontMap]??fontMap.serif,"--base-size":`${settings.base_font_size}px`,"--heading-size":`${settings.heading_font_size}px`,"--eyebrow-size":`${settings.eyebrow_font_size}px`} as CSSProperties;
+  const heroImage=publicImageUrl(settings.hero_image_path),aboutImage=publicImageUrl(settings.about_image_path);
+  return <main className="public-site" style={style}>
+    <SiteHeader storeName={settings.store_name}/>
+    <section className={`hero reference-hero${heroImage?" has-photo":""}`} style={heroImage?{backgroundImage:`linear-gradient(90deg,rgba(45,28,22,.72),rgba(45,28,22,.08)),url(${heroImage})`}:undefined}><div className="hero-copy"><p className="eyebrow">愛知県安城市のマイクロブタカフェ</p><h1>{lines(copy.hero.heading)}</h1><p>{copy.hero.body}</p><div className="hero-actions"><a className="button" href="#reservation">ご予約はこちら</a><a className="text-link" href="#pigs">みんなを見てみる</a></div></div>{!heroImage&&<div className="hero-art" aria-label="メイン写真の設定場所"><div className="pig-shape"><span className="ear left"/><span className="ear right"/><span className="eye e1"/><span className="eye e2"/><span className="snout">•　•</span></div></div>}<div className="hours-card"><span>営業時間<strong>{settings.business_hours}</strong></span><span>定休日<strong>{settings.closed_days}</strong></span></div></section>
+    <section id="about" className="section about reference-about"><div><p className="eyebrow">ABOUT US</p><h2>{lines(copy.about.heading)}</h2></div><div><div className="multiline">{copy.about.body}</div>{aboutImage&&<div className="about-photo" style={{backgroundImage:`url(${aboutImage})`}}/>}</div></section>
+    <section id="pigs" className="section tinted reference-friends"><div className="section-heading"><p className="eyebrow">OUR LITTLE FRIENDS</p><h2>{copy.friends.heading}</h2><p>{copy.friends.body}</p></div><div className="friend-grid">{pigs.map((pig,index)=><article key={pig.id}><div className="friend-photo" style={pig.image_path?{backgroundImage:`url(${publicImageUrl(pig.image_path)})`}:{backgroundColor:["#ead4cb","#d7c9bf","#e7c7ba"][index%3]}}>🐽</div><div><h3>{pig.name}</h3><p>{pig.breed}</p></div><span>♡</span></article>)}</div></section>
+    <section id="guide" className="section dark-guide"><div className="section-heading"><p className="eyebrow">VISIT GUIDE</p><h2>ご来店について</h2><p>安心して楽しんでいただくためのご案内です。</p></div><div className="guide-grid">{["guide_reservation","guide_parking","guide_access"].map((key,index)=><article key={key}><b>0{index+1}</b><h3>{copy[key].heading}</h3><p>{copy[key].body}</p></article>)}</div></section>
+    <section id="reservation" className="section reservation reference-reservation"><div className="section-heading"><p className="eyebrow">ONLINE RESERVATION</p><h2>{copy.reservation.heading}</h2><p>{copy.reservation.body}</p></div><ReservationForm/></section>
+    <section id="faq" className="section faq"><div className="section-heading"><p className="eyebrow">FAQ</p><h2>よくある質問</h2></div><div>{faqs.map(([q,a],i)=><details key={q} open={i===0}><summary><span>Q.</span>{q}<b>＋</b></summary><p>{a}</p></details>)}</div></section>
+    <section className="section access"><div><p className="eyebrow">SHOP INFORMATION</p><h2>店舗情報</h2><dl><dt>店名</dt><dd>{settings.store_name}</dd><dt>営業時間</dt><dd>{settings.business_hours}</dd><dt>定休日</dt><dd>{settings.closed_days}</dd><dt>駐車場</dt><dd>専用駐車場 {settings.parking_capacity}台（要予約）</dd><dt>住所</dt><dd>{settings.address}</dd>{settings.phone&&<><dt>電話</dt><dd>{settings.phone}</dd></>}</dl></div><a className="map" href={settings.map_url||undefined} target={settings.map_url?"_blank":undefined} rel="noreferrer"><span>MAP</span><p>{settings.map_url?"Googleマップを開く":"管理画面からGoogleマップURLを設定できます"}</p></a></section>
+    <footer><div className="logo"><span>MICRO PIG CAFE</span>{copy.footer.heading||settings.store_name}</div><p>{copy.footer.body}</p><small>© {new Date().getFullYear()} {settings.store_name}</small></footer>
   </main>;
 }
+
+function lines(value:string){const parts=value.split("\n");return parts.map((line,index)=><span key={`${line}-${index}`}>{line}{index<parts.length-1&&<br/>}</span>)}
