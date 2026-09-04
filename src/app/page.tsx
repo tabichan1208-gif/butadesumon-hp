@@ -1,3 +1,4 @@
+import { AnimalRegistration } from "@/components/animal-registration";
 import { InteriorGallery } from "@/components/interior-gallery";
 import type { CSSProperties } from "react";
 import { ReservationForm } from "@/components/reservation-form";
@@ -33,6 +34,7 @@ export default async function Home(){
     <InteriorGallery photos={interiorData??[]}/>
     <section id="faq" className="section faq"><div className="section-heading"><p className="eyebrow">FAQ</p><h2>よくある質問</h2></div><div>{faqs.map(([q,a],i)=><details key={q} open={i===0}><summary><span>Q.</span>{q}<b>＋</b></summary><p>{a}</p></details>)}</div></section>
     <section className="section access"><div><p className="eyebrow">SHOP INFORMATION</p><h2>店舗情報</h2><dl><dt>店名</dt><dd>{settings.store_name}</dd><dt>営業時間</dt><dd>{settings.business_hours}</dd><dt>定休日</dt><dd>{settings.closed_days}</dd><dt>駐車場</dt><dd>専用駐車場 {settings.parking_capacity}台（要予約）</dd><dt>住所</dt><dd>{settings.address}</dd>{settings.phone&&<><dt>電話</dt><dd>{settings.phone}</dd></>}</dl></div><a className="map" href={settings.map_url||undefined} target={settings.map_url?"_blank":undefined} rel="noreferrer"><span>MAP</span><p>{settings.map_url?"Googleマップを開く":"管理画面からGoogleマップURLを設定できます"}</p></a></section>
+    <AnimalRegistration settings={settings}/>
     <footer><div className="logo"><span>MICRO PIG CAFE</span>{copy.footer.heading||settings.store_name}</div><p>{copy.footer.body}</p><small>© {new Date().getFullYear()} {settings.store_name}</small></footer>
   </main>;
 }

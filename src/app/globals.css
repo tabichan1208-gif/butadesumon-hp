@@ -38,6 +38,12 @@
 .interior-edit-actions .media-delete{margin:0}
 .interior-picker{max-height:360px;overflow:auto;padding:4px}
 @media(max-width:600px){.interior-gallery{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:16px;padding-bottom:14px}.interior-gallery figure{flex:0 0 88%;scroll-snap-align:start}.interior-gallery figure:only-child{flex-basis:100%}.interior-swipe-hint{display:block;font-size:12px}.interior-picker{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.public-site .animal-registration{padding:28px max(24px,calc((100% - 1100px)/2));background:#f0e9e1;color:#51443d}
+.public-site .animal-registration h2{font-size:14px;margin:0 0 12px;font-family:var(--site-font)}
+.animal-registration dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 24px;margin:0;font-size:13px;line-height:1.8}
+.animal-registration dt{font-weight:600}
+.animal-registration dd{margin:0;overflow-wrap:anywhere}
+@media(max-width:600px){.animal-registration dl{grid-template-columns:1fr;gap:2px}.animal-registration dd{margin-bottom:10px}}
 .media-usage{font-size:13px;margin:12px 0;overflow-wrap:anywhere}
 .media-usage ul{padding-left:20px;margin:6px 0}
 .media-delete{margin-top:12px;min-height:44px;padding:8px 16px;border:1px solid #a43f46;border-radius:8px;color:#a43f46;background:white;cursor:pointer}

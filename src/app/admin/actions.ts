@@ -99,6 +99,10 @@ export async function saveSiteSettings(formData:FormData):Promise<ActionResult>{
   const supabase=await getStaffClient();
   if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
   const payload={
+    animal_registration_number:text(formData,"animal_registration_number"),
+    animal_registration_date:text(formData,"animal_registration_date"),
+    animal_registration_expiry:text(formData,"animal_registration_expiry"),
+    animal_responsible_person:text(formData,"animal_responsible_person"),
     store_name:text(formData,"store_name"),tagline:text(formData,"tagline"),business_hours:text(formData,"business_hours"),
     closed_days:text(formData,"closed_days"),address:text(formData,"address"),phone:text(formData,"phone")||null,
     map_url:text(formData,"map_url")||null,primary_color:text(formData,"primary_color"),background_color:text(formData,"background_color"),
