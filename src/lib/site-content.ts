@@ -1,4 +1,7 @@
+import type { RegistrationEntry } from "./animal-registrations";
+
 export type SiteSettings = {
+  animal_registrations:RegistrationEntry[]|null;
   animal_registration_published:boolean;
   animal_registrant:string;
   animal_business_name:string;
@@ -17,6 +20,7 @@ export type SiteSettings = {
 export type SiteCopy = Record<string,{heading:string;body:string}>;
 
 export const defaultSettings:SiteSettings={
+  animal_registrations:null,
   animal_registration_published:false,
   animal_registrant:"",
   animal_business_name:"",

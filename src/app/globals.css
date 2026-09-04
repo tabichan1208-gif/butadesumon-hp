@@ -42,6 +42,15 @@
 .public-site .animal-registration h2{font-size:14px;margin:0 0 12px;font-family:var(--site-font)}
 .animal-registration dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 24px;margin:0;font-size:13px;line-height:1.8}
 .settings-fields .registration-publish input{width:auto;margin-right:8px}
+.registration-rows{border:1px solid var(--line);padding:16px;border-radius:10px;min-width:0}
+.registration-rows p{font-size:13px}
+.registration-edit-row{display:grid;grid-template-columns:1fr 2fr auto;align-items:end;gap:12px;margin:12px 0}
+.registration-edit-row .media-delete{margin:0}
+.registration-table{margin-top:20px;width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+.registration-table caption{text-align:left;font-weight:600;margin-bottom:8px}
+.registration-table th,.registration-table td{text-align:left;border-bottom:1px solid #c5b8ac;padding:8px;overflow-wrap:anywhere}
+.registration-table th:first-child{width:25%}
+@media(max-width:600px){.registration-edit-row{grid-template-columns:1fr}.registration-edit-row .media-delete{justify-self:start}}
 .animal-registration dt{font-weight:600}
 .animal-registration dd{margin:0;overflow-wrap:anywhere}
 @media(max-width:600px){.animal-registration dl{grid-template-columns:1fr;gap:2px}.animal-registration dd{margin-bottom:10px}}
