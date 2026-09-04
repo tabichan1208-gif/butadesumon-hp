@@ -29,6 +29,16 @@
 @media(max-width:600px){.public-site .section h2,.public-site .reference-hero h1{font-size:var(--heading-size)}}
 
 /* Image size guidance in the CMS */
+.parking-timeline{margin-top:20px}
+.parking-slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:20px;max-height:480px;overflow:auto}
+.parking-slot{border:1px solid #cad9c8;background:#f3f7f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.parking-slot time{font-size:12px;font-weight:700}
+.parking-slot>strong{color:#49604c;font-size:12px}
+.parking-slot.reserved{background:#f9eae6;border-color:#dab0aa}
+.parking-slot.reserved>strong{color:#984a50}
+.parking-slot button{width:100%;text-align:left;border:1px solid #dab0aa;border-radius:8px;background:white;padding:10px;cursor:pointer;margin-top:5px}
+.parking-slot button:hover,.parking-slot button:focus-visible{outline:2px solid var(--rose);outline-offset:2px}
+.parking-slot button b,.parking-slot button small{display:block;font-size:11px;overflow-wrap:anywhere}
 .image-edit-grid article>b:after{display:block;margin-top:3px;color:var(--muted);font-size:10px;font-weight:400}
 .image-edit-grid article:nth-child(1)>b:after{content:"推奨 1920 × 1080px（横長・16:9）"}
 .image-edit-grid article:nth-child(2)>b:after{content:"推奨 1080 × 1350px（縦長・4:5）"}

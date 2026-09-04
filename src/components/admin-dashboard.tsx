@@ -50,6 +50,7 @@ function ReservationPanel({reservations}:{reservations:AdminReservation[]}) {
     {notice&&<p className="admin-notice">{notice}</p>}
     <div className="admin-cards"><article><span>予約</span><b>{activeReservations.length}<small>件</small></b><em>選択日の有効な予約</em></article><article><span>ご来店予定</span><b>{totalGuests}<small>名</small></b><em>延べ人数</em></article><article><span>最大同時人数</span><b>{peak}<small>/ 8名</small></b><em>{peak<8?"空きあり":"満員時間あり"}</em></article><article><span>駐車場予約</span><b>{activeReservations.filter(r=>r.parking).length}<small>件</small></b><em>時間の重複を自動防止</em></article></div>
     <div className="admin-reservation-layout"><div className="admin-panel"><div className="panel-head"><div><h2>{formatDate(selectedDate)}の予約</h2><p>キャンセル済みも履歴として残ります</p></div></div><div className="reservation-list">{dayReservations.length===0?<p className="empty-state">この日の予約はありません。</p>:dayReservations.map(r=><button className={`reservation-row${r.status==="CANCELLED"?" cancelled":""}`} key={r.id} onClick={()=>r.status!=="CANCELLED"&&setEditing(r)} disabled={r.status==="CANCELLED"}><time>{r.time}<small>{r.minutes}分</small></time><div className="res-main"><div><span className="source">{sourceLabels[r.source]??r.source}</span>{r.status==="CANCELLED"&&<span className="cancelled-label">キャンセル済み</span>}<h3>{r.name} 様</h3><small>{r.phone}</small></div><p>人数 <b>{r.guests}名</b></p><p>駐車場 <b>{r.parking?"あり":"なし"}</b></p><span>{r.status==="CANCELLED"?"":"›"}</span></div></button>)}</div></div><Timeline reservations={activeReservations}/></div>
+    <ParkingTimeline reservations={activeReservations} onSelect={setEditing}/>
     {editing&&<ReservationEditor reservation={editing==="new"?null:editing} date={selectedDate} pending={pending} onClose={()=>setEditing(null)} onSubmit={submit} onCancel={cancel}/>} 
   </>;
 }
@@ -61,6 +62,18 @@ function ReservationEditor({reservation,date,pending,onClose,onSubmit,onCancel}:
 function Timeline({reservations}:{reservations:AdminReservation[]}) { const slots=timeline(reservations);return <div className="admin-panel timeline-panel"><div className="panel-head"><div><h2>店内タイムライン</h2><p>15分ごとの同時人数と駐車場</p></div></div>{slots.length===0?<p className="empty-state">予約が入ると表示されます。</p>:<div className="timeline-list">{slots.map(s=><div key={s.time}><time>{s.time}</time><span className="occupancy"><i style={{width:`${Math.min(100,s.guests/8*100)}%`}}/></span><b>{s.guests}/8名</b><small>{s.parking?"🚗 使用中":"駐車場 空き"}</small></div>)}</div>}</div> }
 
 function timeline(reservations:AdminReservation[]){if(!reservations.length)return[];const toMinutes=(t:string)=>{const[h,m]=t.split(":").map(Number);return h*60+m};const start=Math.min(...reservations.map(r=>toMinutes(r.time)));const end=Math.max(...reservations.map(r=>toMinutes(r.time)+r.minutes));const slots=[];for(let minute=Math.floor(start/15)*15;minute<end;minute+=15){const current=reservations.filter(r=>{const s=toMinutes(r.time);return s<=minute&&s+r.minutes>minute});slots.push({time:`${String(Math.floor(minute/60)).padStart(2,"0")}:${String(minute%60).padStart(2,"0")}`,guests:current.reduce((n,r)=>n+r.guests,0),parking:current.some(r=>r.parking)})}return slots}
+function ParkingTimeline({reservations,onSelect}:{reservations:AdminReservation[];onSelect:(reservation:AdminReservation)=>void}){
+  const active=reservations.filter(r=>r.status!=="CANCELLED");
+  const slots=timeline(active);
+  const parking=active.filter(r=>r.parking);
+  const minutes=(time:string)=>{const[h,m]=time.split(":").map(Number);return h*60+m};
+  const clock=(value:number)=>`${String(Math.floor(value/60)).padStart(2,"0")}:${String(value%60).padStart(2,"0")}`;
+  return <section className="admin-panel parking-timeline"><div className="panel-head"><div><h2>駐車場タイムライン</h2><p>予約のある時間帯を15分ごとに表示。予約者名を押すと詳細が開きます。</p></div></div>{slots.length===0?<p className="empty-state">この日の予約はありません。駐車場の予約もありません。</p>:<div className="parking-slots">{slots.map(slot=>{
+    const start=minutes(slot.time);
+    const current=parking.filter(r=>minutes(r.time)<start+15&&minutes(r.time)+r.minutes>start);
+    return <div className={current.length?"parking-slot reserved":"parking-slot"} key={slot.time}><time>{slot.time}〜{clock(start+15)}</time><strong>{current.length?"予約あり":"空き"}</strong><div>{current.map(r=><button type="button" key={r.id} onClick={()=>onSelect(r)} aria-label={`${r.name}様の駐車場予約を開く`}><b>{r.name} 様 ›</b><small>{r.time}〜{clock(minutes(r.time)+r.minutes)}（{r.minutes}分）</small></button>)}</div></div>;
+  })}</div>}</section>;
+}
 function formatDate(value:string){const[y,m,d]=value.split("-");return `${y}年${Number(m)}月${Number(d)}日`}
 function SiteCopyEditor({copy,settings,media}:{copy:SiteCopy;settings:SiteSettings;media:AdminMedia[]}){
   const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");const[pickerSlot,setPickerSlot]=useState<"hero"|"hero_mobile"|"about"|null>(null);
