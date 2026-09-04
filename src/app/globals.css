@@ -29,6 +29,12 @@
 @media(max-width:600px){.public-site .section h2,.public-site .reference-hero h1{font-size:var(--heading-size)}}
 
 /* Image size guidance in the CMS */
+.reservation-row .res-main>div{min-width:0}
+.reservation-note{margin:9px 8px 0;padding:9px 11px;border-radius:8px;background:#faf3e9;border:1px solid #eadbca;text-align:left}
+.reservation-note strong{display:block;font-size:11px;color:#806044}
+.reservation-note span{display:block;font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
+.reservation-row.cancelled .reservation-note{background:#eee9e4}
+@media(max-width:600px){.reservation-note{margin-left:0;margin-right:0}}
 /* Online-only management app: touch targets and safe areas */
 .admin-app{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);background:#f6f4f0}
 .app-install-help{padding:12px 20px;background:#fffdf8;border-bottom:1px solid var(--line);font-size:13px}
