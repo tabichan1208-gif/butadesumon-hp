@@ -1,4 +1,9 @@
 export type SiteSettings = {
+  animal_registration_published:boolean;
+  animal_registrant:string;
+  animal_business_name:string;
+  animal_business_address:string;
+  animal_business_type:string;
   animal_registration_number:string;
   animal_registration_date:string;
   animal_registration_expiry:string;
@@ -12,6 +17,11 @@ export type SiteSettings = {
 export type SiteCopy = Record<string,{heading:string;body:string}>;
 
 export const defaultSettings:SiteSettings={
+  animal_registration_published:false,
+  animal_registrant:"",
+  animal_business_name:"",
+  animal_business_address:"",
+  animal_business_type:"",
   animal_registration_number:"",
   animal_registration_date:"",
   animal_registration_expiry:"",

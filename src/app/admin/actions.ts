@@ -99,6 +99,11 @@ export async function saveSiteSettings(formData:FormData):Promise<ActionResult>{
   const supabase=await getStaffClient();
   if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
   const payload={
+    animal_registration_published:formData.get("animal_registration_published")==="on",
+    animal_registrant:text(formData,"animal_registrant"),
+    animal_business_name:text(formData,"animal_business_name"),
+    animal_business_address:text(formData,"animal_business_address"),
+    animal_business_type:text(formData,"animal_business_type"),
     animal_registration_number:text(formData,"animal_registration_number"),
     animal_registration_date:text(formData,"animal_registration_date"),
     animal_registration_expiry:text(formData,"animal_registration_expiry"),
@@ -110,6 +115,7 @@ export async function saveSiteSettings(formData:FormData):Promise<ActionResult>{
     heading_font_family:text(formData,"heading_font_family"),heading_font_size:Number(formData.get("heading_font_size")),
     eyebrow_font_size:Number(formData.get("eyebrow_font_size")),
   };
+  if(payload.animal_registration_published && [payload.animal_registrant,payload.animal_business_name,payload.animal_business_address,payload.animal_business_type,payload.animal_registration_number,payload.animal_registration_date,payload.animal_registration_expiry,payload.animal_responsible_person].some(value=>!value.trim()))return {ok:false,message:"登録情報を公開する場合は8項目すべてを入力してください。未確定の場合は公開チェックを外して保存できます。"};
   const{error}=await supabase.from("site_settings").update(payload).eq("id",true);
   if(error)return{ok:false,message:"店舗・デザイン設定を保存できませんでした。"};
   revalidatePath("/");revalidatePath("/admin");
