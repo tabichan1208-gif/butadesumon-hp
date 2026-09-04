@@ -54,7 +54,8 @@
 .animal-registration dt{font-weight:600}
 .animal-registration dd{margin:0;overflow-wrap:anywhere}
 @media(max-width:600px){.animal-registration dl{grid-template-columns:1fr;gap:2px}.animal-registration dd{margin-bottom:10px}}
-.public-site .reference-reservation>.section-heading>p:not(.eyebrow){text-align:left;overflow-wrap:anywhere}
+.public-site .reference-reservation>.section-heading>.reservation-intro{text-align:center;overflow-wrap:anywhere}
+.public-site .reference-reservation>.section-heading>.reservation-notice{text-align:left;overflow-wrap:anywhere}
 .media-usage{font-size:13px;margin:12px 0;overflow-wrap:anywhere}
 .media-usage ul{padding-left:20px;margin:6px 0}
 .media-delete{margin-top:12px;min-height:44px;padding:8px 16px;border:1px solid #a43f46;border-radius:8px;color:#a43f46;background:white;cursor:pointer}
