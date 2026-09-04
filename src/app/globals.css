@@ -17,11 +17,14 @@
 
 /* Editable design overrides */
 .public-site .section h2,.public-site .reference-hero h1{font-size:var(--heading-size)}
+.public-site{--hero-shade:linear-gradient(90deg,rgba(45,28,22,.62) 0%,rgba(45,28,22,.38) 32%,rgba(45,28,22,0) 65%)}
 .reference-hero{background-image:var(--hero-desktop-image)}
 .picker-grid>.picker-button{width:100%;border:1px solid #e8e0da;border-radius:12px;padding:8px;background:white;cursor:pointer;text-align:left}
 .picker-grid>.picker-button:hover{border-color:var(--rose);box-shadow:0 0 0 3px var(--blush)}
 .library-select{min-height:40px;border:1px solid var(--rose);border-radius:8px;background:white;color:var(--rose);font-weight:700;cursor:pointer}
 .settings-fields input[type="color"]{height:54px;padding:5px;cursor:pointer}
+.public-site p,.public-site h2,.public-site h3,.public-site dd{white-space:pre-line}
+.public-site .about-photo{height:300px}
 @media(max-width:900px){.reference-hero{background-image:var(--hero-mobile-image)}}
 @media(max-width:600px){.public-site .section h2,.public-site .reference-hero h1{font-size:var(--heading-size)}}
 
