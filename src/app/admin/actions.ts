@@ -7,13 +7,14 @@ import { mediaUsage } from "@/lib/media-usage";
 export async function deleteLibraryImage(id: string): Promise<ActionResult> {
   const supabase = await getStaffClient();
   if (!supabase) return { ok: false, message: "ログインが切れました。再度ログインしてください。" };
-  const [asset, settings, pigs] = await Promise.all([
+  const [asset, settings, pigs, interior] = await Promise.all([
     supabase.from("media_assets").select("storage_path").eq("id", id).single(),
     supabase.from("site_settings").select("hero_image_path,hero_mobile_image_path,about_image_path").eq("id", true).single(),
     supabase.from("pigs").select("name,image_path,published"),
+    supabase.from("interior_photos").select("image_path,caption,published"),
   ]);
-  if (asset.error || settings.error || pigs.error) return { ok: false, message: "使用場所を確認できないため削除を中止しました。画面を更新してください。" };
-  const places = mediaUsage(asset.data.storage_path, settings.data, pigs.data);
+  if (asset.error || settings.error || pigs.error || interior.error) return { ok: false, message: "使用場所を確認できないため削除を中止しました。店内写真用のSQLを適用し、画面を更新してください。" };
+  const places = mediaUsage(asset.data.storage_path, settings.data, pigs.data, interior.data);
   if (places.length) return { ok: false, message: `使用中のため削除できません：${places.join("、")}` };
   // Keep the original file recoverable; only remove it from library choices.
   const { data, error } = await supabase.from("media_assets").update({ deleted_at: new Date().toISOString() }).eq("id", id).select("id");
@@ -23,6 +24,30 @@ export async function deleteLibraryImage(id: string): Promise<ActionResult> {
 }
 
 type ActionResult = { ok: boolean; message: string };
+
+export async function saveInteriorPhoto(formData: FormData): Promise<ActionResult> {
+  const supabase = await getStaffClient();
+  if (!supabase) return {ok:false,message:"再度ログインしてください。"};
+  const id=text(formData,"id"), path=text(formData,"image_path"), caption=text(formData,"caption");
+  const order=Number(formData.get("sort_order"));
+  if (!path || caption.length>500 || !Number.isSafeInteger(order) || Math.abs(order)>1000000) return {ok:false,message:"写真・説明文（500文字以内）・表示順を確認してください。"};
+  const asset=await supabase.from("media_assets").select("*").eq("storage_path",path).single();
+  if(asset.error || asset.data.deleted_at) return {ok:false,message:"画像ライブラリから利用可能な写真を選び直してください。"};
+  const payload={image_path:path,caption,sort_order:order,published:formData.get("published")==="on"};
+  const result=id ? await supabase.from("interior_photos").update(payload).eq("id",id).select("id") : await supabase.from("interior_photos").insert(payload).select("id");
+  if(result.error || !result.data?.length)return {ok:false,message:"保存できませんでした。店内写真用のSQLと権限を確認してください。"};
+  revalidatePath("/");revalidatePath("/admin");
+  return {ok:true,message:"店内写真を保存しました。"};
+}
+
+export async function removeInteriorPhoto(id:string):Promise<ActionResult>{
+  const supabase=await getStaffClient();
+  if(!supabase)return {ok:false,message:"再度ログインしてください。"};
+  const {data,error}=await supabase.from("interior_photos").delete().eq("id",id).select("id");
+  if(error || !data?.length)return {ok:false,message:"掲載を解除できませんでした。画面を更新してください。"};
+  revalidatePath("/");revalidatePath("/admin");
+  return {ok:true,message:"店内写真の掲載を解除しました。画像ライブラリの写真は残っています。"};
+}
 
 async function getStaffClient() {
   const supabase = await createClient();
