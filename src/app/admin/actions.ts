@@ -2,6 +2,25 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { mediaUsage } from "@/lib/media-usage";
+
+export async function deleteLibraryImage(id: string): Promise<ActionResult> {
+  const supabase = await getStaffClient();
+  if (!supabase) return { ok: false, message: "ログインが切れました。再度ログインしてください。" };
+  const [asset, settings, pigs] = await Promise.all([
+    supabase.from("media_assets").select("storage_path").eq("id", id).single(),
+    supabase.from("site_settings").select("hero_image_path,hero_mobile_image_path,about_image_path").eq("id", true).single(),
+    supabase.from("pigs").select("name,image_path,published"),
+  ]);
+  if (asset.error || settings.error || pigs.error) return { ok: false, message: "使用場所を確認できないため削除を中止しました。画面を更新してください。" };
+  const places = mediaUsage(asset.data.storage_path, settings.data, pigs.data);
+  if (places.length) return { ok: false, message: `使用中のため削除できません：${places.join("、")}` };
+  // Keep the original file recoverable; only remove it from library choices.
+  const { data, error } = await supabase.from("media_assets").update({ deleted_at: new Date().toISOString() }).eq("id", id).select("id");
+  if (error || !data?.length) return { ok: false, message: "削除できませんでした。画像ライブラリ用のSQLが適用されているか確認してください。" };
+  revalidatePath("/admin");
+  return { ok: true, message: "画像をライブラリから削除しました。復旧用の元ファイルは保管されています。" };
+}
 
 type ActionResult = { ok: boolean; message: string };
 

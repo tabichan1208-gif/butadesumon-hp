@@ -23,7 +23,11 @@
 .picker-grid>.picker-button:hover{border-color:var(--rose);box-shadow:0 0 0 3px var(--blush)}
 .library-select{min-height:40px;border:1px solid var(--rose);border-radius:8px;background:white;color:var(--rose);font-weight:700;cursor:pointer}
 .settings-fields input[type="color"]{height:54px;padding:5px;cursor:pointer}
-.public-site p,.public-site h2,.public-site h3,.public-site dd{white-space:pre-line}
+.public-site p,.public-site h2,.public-site h3,.public-site dd,.public-site footer .logo{white-space:pre-line}
+.media-usage{font-size:13px;margin:12px 0;overflow-wrap:anywhere}
+.media-usage ul{padding-left:20px;margin:6px 0}
+.media-delete{margin-top:12px;min-height:44px;padding:8px 16px;border:1px solid #a43f46;border-radius:8px;color:#a43f46;background:white;cursor:pointer}
+.media-delete:disabled{color:#777;border-color:#ccc;cursor:not-allowed}
 .public-site .about-photo{height:300px}
 @media(max-width:900px){.reference-hero{background-image:var(--hero-mobile-image)}}
 @media(max-width:600px){.public-site .section h2,.public-site .reference-hero h1{font-size:var(--heading-size)}}
