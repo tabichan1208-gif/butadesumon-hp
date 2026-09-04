@@ -3,7 +3,7 @@ import { InteriorGallery } from "@/components/interior-gallery";
 import type { CSSProperties } from "react";
 import { ReservationForm } from "@/components/reservation-form";
 import { SiteHeader } from "@/components/site-header";
-import { faqs as fallbackFaqs, pigs as fallbackPigs } from "@/lib/mock-data";
+import { faqs as fallbackFaqs } from "@/lib/mock-data";
 import { createClient } from "@/lib/supabase/server";
 import { defaultCopy, defaultSettings, publicImageUrl } from "@/lib/site-content";
 
@@ -22,7 +22,7 @@ export default async function Home(){
   const copy={...defaultCopy};for(const row of contentData??[])copy[row.section_key]={heading:normalizeBreaks(row.heading??""),body:normalizeBreaks(row.body??"")};
   const [reservationIntro,...reservationNotes]=copy.reservation.body.trimStart().split(/\r?\n/);
   const reservationNotice=reservationNotes.join("\n").trim();
-  const pigs=pigData?.length?pigData:fallbackPigs.map(p=>({...p,image_path:""}));
+  const pigs=pigData??[];
   const faqs=faqData?.length?faqData.map(item=>[item.question,item.answer] as const):fallbackFaqs;
   const heroImage=publicImageUrl(settings.hero_image_path),heroMobileImage=publicImageUrl(settings.hero_mobile_image_path),aboutImage=publicImageUrl(settings.about_image_path);
   const style={"--rose":settings.primary_color,"--cream":settings.background_color,"--site-font":fontMap[settings.font_family as keyof typeof fontMap]??fontMap.gothic,"--heading-font":fontMap[settings.heading_font_family as keyof typeof fontMap]??fontMap.serif,"--base-size":`${settings.base_font_size}px`,"--heading-size":`${settings.heading_font_size}px`,"--eyebrow-size":`${settings.eyebrow_font_size}px`,"--hero-desktop-image":heroImage?`var(--hero-shade),url(${heroImage})`:"none","--hero-mobile-image":heroMobileImage?`var(--hero-shade),url(${heroMobileImage})`:heroImage?`var(--hero-shade),url(${heroImage})`:"none"} as CSSProperties;

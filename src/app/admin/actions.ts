@@ -171,6 +171,17 @@ async function storeImage(supabase:Awaited<ReturnType<typeof createClient>>,file
   return{path,message:""};
 }
 
+export async function deletePig(id:string):Promise<ActionResult>{
+  const supabase=await getStaffClient();
+  if(!supabase)return {ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))return {ok:false,message:"削除対象を確認してください。"};
+  const {data,error}=await supabase.from("pigs").delete().eq("id",id).select("id");
+  if(error)return {ok:false,message:"削除できませんでした。こぶた削除用のSQLが適用されているか確認してください。"};
+  if(!data?.length)return {ok:false,message:"対象が見つからないか、削除する権限がありません。画面を更新してください。"};
+  revalidatePath("/");revalidatePath("/admin");
+  return {ok:true,message:"こぶた紹介を削除しました。画像ライブラリの元写真は残しています。"};
+}
+
 export async function savePig(formData:FormData):Promise<ActionResult>{
   const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
   const id=text(formData,"id");let imagePath=text(formData,"image_path");const file=formData.get("image");
