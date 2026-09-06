@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/site-header";
 import { faqs as fallbackFaqs } from "@/lib/mock-data";
 import { createClient } from "@/lib/supabase/server";
 import { defaultCopy, defaultSettings, publicImageUrl } from "@/lib/site-content";
+import type { Metadata } from "next";
 
 const fontMap={
   gothic:'"Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",sans-serif',
@@ -17,6 +18,23 @@ const fontMap={
   "classic-serif":'"Hiragino Mincho ProN","YuMincho","Yu Mincho",serif',
   handwritten:'Klee,"Klee One",YuKyokasho,"Yu Kyokasho","Hiragino Mincho ProN",serif'
 };
+
+export async function generateMetadata():Promise<Metadata>{
+  const supabase=await createClient();
+  const{data}=await supabase.from("site_settings").select("seo_title,seo_description,seo_keywords,seo_canonical_url,seo_image_path,seo_indexing_enabled,hero_image_path").eq("id",true).maybeSingle();
+  const settings={...defaultSettings,...(data??{})};
+  const image=publicImageUrl(settings.seo_image_path||settings.hero_image_path);
+  const canonical=/^https:\/\//.test(settings.seo_canonical_url)?settings.seo_canonical_url:undefined;
+  return{
+    title:settings.seo_title,
+    description:settings.seo_description,
+    keywords:String(settings.seo_keywords).split(/[,、]/).map((value:string)=>value.trim()).filter(Boolean),
+    alternates:canonical?{canonical}:undefined,
+    robots:{index:settings.seo_indexing_enabled,follow:settings.seo_indexing_enabled},
+    openGraph:{type:"website",locale:"ja_JP",title:settings.seo_title,description:settings.seo_description,url:canonical,images:image?[{url:image}]:undefined},
+    twitter:{card:image?"summary_large_image":"summary",title:settings.seo_title,description:settings.seo_description,images:image?[image]:undefined}
+  };
+}
 
 export default async function Home(){
   const supabase=await createClient();

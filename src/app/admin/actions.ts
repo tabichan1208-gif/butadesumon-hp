@@ -11,7 +11,7 @@ export async function deleteLibraryImage(id: string): Promise<ActionResult> {
   if (!supabase) return { ok: false, message: "ログインが切れました。再度ログインしてください。" };
   const [asset, settings, pigs, interior] = await Promise.all([
     supabase.from("media_assets").select("storage_path").eq("id", id).single(),
-    supabase.from("site_settings").select("hero_image_path,hero_mobile_image_path,about_image_path,exterior_image_path").eq("id", true).single(),
+    supabase.from("site_settings").select("hero_image_path,hero_mobile_image_path,about_image_path,exterior_image_path,seo_image_path").eq("id", true).single(),
     supabase.from("pigs").select("name,image_path,published"),
     supabase.from("interior_photos").select("image_path,caption,published"),
   ]);
@@ -91,6 +91,20 @@ export async function saveEmailSettings(formData:FormData):Promise<ActionResult>
   if(error)return{ok:false,message:"メール設定を保存できませんでした。メール設定用のSQLを適用してから、もう一度お試しください。"};
   revalidatePath("/admin");
   return{ok:true,message:"メール設定を保存しました。Gmail接続までは自動送信されません。"};
+}
+
+export async function saveSeoSettings(formData:FormData):Promise<ActionResult>{
+  const supabase=await getStaffClient();
+  if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const canonical=text(formData,"seo_canonical_url");
+  if(canonical&&!/^https:\/\/[^\s]+$/.test(canonical))return{ok:false,message:"正規URLは https:// から始まる公開サイトのURLを入力してください。"};
+  const payload={seo_title:text(formData,"seo_title"),seo_description:text(formData,"seo_description"),seo_keywords:text(formData,"seo_keywords"),seo_canonical_url:canonical||null,seo_image_path:text(formData,"seo_image_path")||null,seo_indexing_enabled:formData.get("seo_indexing_enabled")==="on"};
+  if(!payload.seo_title||payload.seo_title.length>100)return{ok:false,message:"検索結果のタイトルを1〜100文字で入力してください。"};
+  if(!payload.seo_description||payload.seo_description.length>300)return{ok:false,message:"検索結果の説明文を1〜300文字で入力してください。"};
+  const{error}=await supabase.from("site_settings").update(payload).eq("id",true);
+  if(error)return{ok:false,message:"SEO設定を保存できませんでした。SEO設定用のSQLを適用してから、もう一度お試しください。"};
+  revalidatePath("/");revalidatePath("/admin");
+  return{ok:true,message:"SEO設定を保存しました。検索結果への反映には時間がかかる場合があります。"};
 }
 
 export async function saveReservation(formData: FormData): Promise<ActionResult> {
