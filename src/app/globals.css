@@ -136,8 +136,8 @@
 .image-edit-grid article:nth-child(3)>b:after{content:"推奨 1200 × 900px（横長・4:3）"}
 .manager-fields label:nth-of-type(4):after{content:"推奨 1200 × 1500px（縦長・4:5）";color:var(--muted);font-size:9px;font-weight:400}
 .image-edit-grid article:nth-child(4)>b:after{content:"推奨 1600 × 1000px（横長）"}
-.access-visuals{display:grid;gap:16px}.access-exterior{min-height:300px;border-radius:18px;background:#eee8e2 center/cover}.access-visuals .map{min-height:240px;border-radius:18px}
-@media(max-width:600px){.access-exterior{min-height:230px}.access-visuals .map{min-height:220px}}
+.access-visuals{display:grid;gap:16px}.access-exterior{min-height:380px;border-radius:18px;background:#eee8e2 center/cover}.access-visuals .map{min-height:240px;border-radius:18px}
+@media(max-width:600px){.access-exterior{min-height:280px}.access-visuals .map{min-height:220px}}
 
 /* Handwritten brand logo */
 .header-logo{display:block;width:180px;height:68px;overflow:hidden;flex:0 0 auto}
