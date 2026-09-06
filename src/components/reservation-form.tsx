@@ -56,6 +56,5 @@ export function ReservationForm() {
     {total > 8 && <p className="error">同時入店人数は8名までです。</p>}
     {error && <p className="error">{error}</p>}
     <button className="button full" disabled={sending || total < 1 || total > 8}>{sending ? "空き状況を確認中…" : "空き状況を確認して予約する"}</button>
-    <p className="form-note">料金は当日のお会計です。この画面では料金計算を行いません。</p>
   </form>;
 }
