@@ -4,13 +4,14 @@ import { FormEvent, useMemo, useRef, useState } from "react";
 
 const durations = [15, 30, 45, 60];
 const localDateString = (date=new Date()) => new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,10);
+type Confirmation={id:string;date:string;time:string;duration:number;name:string;adults:number;children:number;infants:number;parking:boolean;note:string};
 
 export function ReservationForm() {
   const [people, setPeople] = useState({ adults: 1, children: 0, infants: 0 });
   const [reservationDate, setReservationDate] = useState("");
   const [duration, setDuration] = useState(30);
   const [startTime, setStartTime] = useState("");
-  const [sent, setSent] = useState(false);
+  const [confirmation, setConfirmation] = useState<Confirmation|null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const errorRef = useRef<HTMLDivElement>(null);
@@ -46,10 +47,17 @@ export function ReservationForm() {
       window.setTimeout(()=>errorRef.current?.scrollIntoView({behavior:"smooth",block:"center"}),0);
       return;
     }
-    setSent(true);
+    const result=await response.json().catch(()=>({}));
+    setConfirmation({id:String(result?.id??""),date:String(data.get("date")??""),time:String(data.get("time")??""),duration:Number(data.get("duration")),name:String(data.get("name")??""),adults:people.adults,children:people.children,infants:people.infants,parking:data.get("parking")==="yes",note:String(data.get("note")??"")});
+    window.setTimeout(()=>document.querySelector(".reservation-confirmation")?.scrollIntoView({behavior:"smooth",block:"start"}),0);
   };
 
-  if (sent) return <div className="success"><span>✓</span><h3>予約リクエストを受け付けました</h3><p>現在はデモ表示です。Supabase接続後に予約確定メールが送られます。</p><button className="button secondary" onClick={() => setSent(false)}>入力画面に戻る</button></div>;
+  if (confirmation) {
+    const[y,m,d]=confirmation.date.split("-");
+    const numberOfGuests=confirmation.adults+confirmation.children+confirmation.infants;
+    const shortId=confirmation.id?confirmation.id.split("-")[0].toUpperCase():"受付済み";
+    return <section className="success reservation-confirmation" aria-live="polite"><span>✓</span><p className="eyebrow">RESERVATION RECEIVED</p><h3>ご予約を受け付けました</h3><p className="screenshot-guide">この画面をスクリーンショットして保存してください。</p><dl><div><dt>受付番号</dt><dd>{shortId}</dd></div><div><dt>来店日</dt><dd>{y}年{Number(m)}月{Number(d)}日</dd></div><div><dt>開始時間</dt><dd>{confirmation.time}</dd></div><div><dt>利用時間</dt><dd>{confirmation.duration}分</dd></div><div><dt>人数</dt><dd>合計 {numberOfGuests}名<small>13歳以上 {confirmation.adults}名／3〜12歳 {confirmation.children}名／2歳以下 {confirmation.infants}名</small></dd></div><div><dt>駐車場</dt><dd>{confirmation.parking?"利用する（1台）":"利用しない"}</dd></div><div><dt>お名前</dt><dd>{confirmation.name} 様</dd></div>{confirmation.note.trim()&&<div><dt>備考</dt><dd>{confirmation.note}</dd></div>}</dl><p className="privacy-note">電話番号とメールアドレスは、安全のためこの画面には表示していません。</p><button className="button secondary" onClick={()=>{setConfirmation(null);setReservationDate("");setStartTime("");setDuration(30);setPeople({adults:1,children:0,infants:0})}}>別の予約をする</button></section>;
+  }
 
   return <form className="booking-form" onSubmit={submit} onChange={()=>error&&setError("")}>
     {error&&<div className="reservation-error" ref={errorRef} role="alert" aria-live="assertive"><strong>予約できませんでした</strong><p>{error}</p></div>}
