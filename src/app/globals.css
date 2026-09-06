@@ -64,6 +64,7 @@
 .media-delete{margin-top:12px;min-height:44px;padding:8px 16px;border:1px solid #a43f46;border-radius:8px;color:#a43f46;background:white;cursor:pointer}
 .media-delete:disabled{color:#777;border-color:#ccc;cursor:not-allowed}
 .public-site .about-photo{height:300px}
+.public-site .reference-about h2{line-height:1.2}
 @media(max-width:900px){.reference-hero{background-image:var(--hero-mobile-image)}}
 @media(max-width:600px){.public-site .section h2,.public-site .reference-hero h1{font-size:var(--heading-size)}}
 
