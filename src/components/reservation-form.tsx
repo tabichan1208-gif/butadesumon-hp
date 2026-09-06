@@ -65,7 +65,7 @@ export function ReservationForm() {
     <div className="form-grid">
       <label>お名前<input required name="name" placeholder="例：安城 太郎" /></label>
       <label>電話番号<input required name="phone" type="tel" placeholder="090-1234-5678" /></label>
-      <label>メール（任意）<input name="email" type="email" placeholder="example@email.com" /></label>
+      <label>メールアドレス（任意）<input name="email" type="email" placeholder="example@email.com" /><small className="field-help">予約完了メールが必要な方は、メールアドレスをご入力ください。</small></label>
       <label className="wide">備考<textarea name="note" rows={3} placeholder="ご質問や配慮が必要なことがあればご記入ください" /></label>
     </div>
     {total > 8 && <p className="error">同時入店人数は8名までです。</p>}
