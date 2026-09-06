@@ -74,6 +74,8 @@
 .reservation-note strong{display:block;font-size:11px;color:#806044}
 .reservation-note span{display:block;font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
 .reservation-row.cancelled .reservation-note{background:#eee9e4}
+.reservation-error{margin:0 0 24px;padding:16px 18px;border:2px solid #b34e56;border-radius:12px;background:#fff0f0;color:#7b2931;box-shadow:0 8px 22px rgba(123,41,49,.08)}
+.reservation-error strong{display:block;font-size:15px}.reservation-error p{margin:4px 0 0;line-height:1.7;font-size:13px}
 @media(max-width:600px){.reservation-note{margin-left:0;margin-right:0}}
 /* Online-only management app: touch targets and safe areas */
 .admin-app{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);background:#f6f4f0}

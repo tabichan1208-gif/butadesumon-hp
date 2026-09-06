@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 
 const durations = [15, 30, 45, 60];
 
@@ -9,6 +9,7 @@ export function ReservationForm() {
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const errorRef = useRef<HTMLDivElement>(null);
   const total = useMemo(() => people.adults + people.children + people.infants, [people]);
   const update = (key: keyof typeof people, value: number) => setPeople((p) => ({ ...p, [key]: Math.max(0, value) }));
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -29,7 +30,8 @@ export function ReservationForm() {
     if (!response?.ok) {
       const result = await response?.json().catch(() => ({}));
       const code = String(result?.code ?? "");
-      setError(code.includes("CAPACITY") ? "この時間は定員に達しています。別の時間をお選びください。" : code.includes("PARKING") ? "この時間の駐車場は予約済みです。" : "予約を送信できませんでした。時間をおいてお試しください。");
+      setError(code.includes("CAPACITY") ? "この時間は定員に達しています。開始時間・利用時間・人数のいずれかを変更してください。" : code.includes("PARKING") ? "この時間の駐車場は予約済みです。「利用しない」を選ぶか、開始時間を変更してください。" : code.includes("INVALID") ? "入力内容に不備があります。来店日・時間・人数・お名前・電話番号をご確認ください。" : "通信エラーのため予約を送信できませんでした。入力内容は残っています。時間をおいて再度お試しください。");
+      window.setTimeout(()=>errorRef.current?.scrollIntoView({behavior:"smooth",block:"center"}),0);
       return;
     }
     setSent(true);
@@ -37,7 +39,8 @@ export function ReservationForm() {
 
   if (sent) return <div className="success"><span>✓</span><h3>予約リクエストを受け付けました</h3><p>現在はデモ表示です。Supabase接続後に予約確定メールが送られます。</p><button className="button secondary" onClick={() => setSent(false)}>入力画面に戻る</button></div>;
 
-  return <form className="booking-form" onSubmit={submit}>
+  return <form className="booking-form" onSubmit={submit} onChange={()=>error&&setError("")}>
+    {error&&<div className="reservation-error" ref={errorRef} role="alert" aria-live="assertive"><strong>予約できませんでした</strong><p>{error}</p></div>}
     <div className="form-grid">
       <label>来店日<input required type="date" name="date" /></label>
       <label>開始時間<select required name="time" defaultValue=""><option value="" disabled>時間を選ぶ</option>{["10:00","10:15","10:30","11:00","13:00","14:00","15:00","16:00"].map(t => <option key={t}>{t}</option>)}</select></label>
@@ -54,7 +57,6 @@ export function ReservationForm() {
       <label className="wide">備考<textarea name="note" rows={3} placeholder="ご質問や配慮が必要なことがあればご記入ください" /></label>
     </div>
     {total > 8 && <p className="error">同時入店人数は8名までです。</p>}
-    {error && <p className="error">{error}</p>}
     <button className="button full" disabled={sending || total < 1 || total > 8}>{sending ? "空き状況を確認中…" : "空き状況を確認して予約する"}</button>
   </form>;
 }
