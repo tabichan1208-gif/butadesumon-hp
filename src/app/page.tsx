@@ -27,13 +27,13 @@ export default async function Home(){
     supabase.from("faqs").select("id,question,answer").eq("published",true).order("sort_order"),
     supabase.from("interior_photos").select("*").eq("published",true).order("sort_order").order("created_at").order("id")
   ]);
-  const settings={...defaultSettings,...settingsData,phone:settingsData?.phone??"",hero_image_path:settingsData?.hero_image_path??"",hero_mobile_image_path:settingsData?.hero_mobile_image_path??"",about_image_path:settingsData?.about_image_path??"",map_url:settingsData?.map_url??""};
+  const settings={...defaultSettings,...settingsData,phone:settingsData?.phone??"",hero_image_path:settingsData?.hero_image_path??"",hero_mobile_image_path:settingsData?.hero_mobile_image_path??"",about_image_path:settingsData?.about_image_path??"",exterior_image_path:settingsData?.exterior_image_path??"",map_url:settingsData?.map_url??""};
   const copy={...defaultCopy};for(const row of contentData??[])copy[row.section_key]={heading:normalizeBreaks(row.heading??""),body:normalizeBreaks(row.body??"")};
   const [reservationIntro,...reservationNotes]=copy.reservation.body.trimStart().split(/\r?\n/);
   const reservationNotice=reservationNotes.join("\n").trim();
   const pigs=pigData??[];
   const faqs=faqData?.length?faqData.map(item=>[item.question,item.answer] as const):fallbackFaqs;
-  const heroImage=publicImageUrl(settings.hero_image_path),heroMobileImage=publicImageUrl(settings.hero_mobile_image_path),aboutImage=publicImageUrl(settings.about_image_path);
+  const heroImage=publicImageUrl(settings.hero_image_path),heroMobileImage=publicImageUrl(settings.hero_mobile_image_path),aboutImage=publicImageUrl(settings.about_image_path),exteriorImage=publicImageUrl(settings.exterior_image_path);
   const style={"--rose":settings.primary_color,"--cream":settings.background_color,"--site-font":fontMap[settings.font_family as keyof typeof fontMap]??fontMap.gothic,"--heading-font":fontMap[settings.heading_font_family as keyof typeof fontMap]??fontMap.serif,"--base-size":`${settings.base_font_size}px`,"--heading-size":`${settings.heading_font_size}px`,"--eyebrow-size":`${settings.eyebrow_font_size}px`,"--hero-desktop-image":heroImage?`var(--hero-shade),url(${heroImage})`:"none","--hero-mobile-image":heroMobileImage?`var(--hero-shade),url(${heroMobileImage})`:heroImage?`var(--hero-shade),url(${heroImage})`:"none"} as CSSProperties;
   return <main className="public-site" style={style}>
     <SiteHeader storeName={settings.store_name}/>
@@ -44,7 +44,7 @@ export default async function Home(){
     <section id="reservation" className="section reservation reference-reservation"><div className="section-heading"><p className="eyebrow">ONLINE RESERVATION</p><h2>{copy.reservation.heading}</h2><p className="reservation-intro">{reservationIntro}</p>{reservationNotice&&<p className="reservation-notice">{reservationNotice}</p>}</div><ReservationForm/></section>
     <InteriorGallery photos={interiorData??[]}/>
     <section id="faq" className="section faq"><div className="section-heading"><p className="eyebrow">FAQ</p><h2>よくある質問</h2></div><div>{faqs.map(([q,a],i)=><details key={q} open={i===0}><summary><span>Q.</span>{q}<b>＋</b></summary><p>{a}</p></details>)}</div></section>
-    <section className="section access"><div><p className="eyebrow">SHOP INFORMATION</p><h2>店舗情報</h2><dl><dt>店名</dt><dd>{settings.store_name}</dd><dt>営業時間</dt><dd>{settings.business_hours}</dd><dt>定休日</dt><dd>{settings.closed_days}</dd><dt>駐車場</dt><dd>専用駐車場 {settings.parking_capacity}台（要予約）</dd><dt>住所</dt><dd>{settings.address}</dd>{settings.phone&&<><dt>電話</dt><dd>{settings.phone}</dd></>}</dl></div><a className="map" href={settings.map_url||undefined} target={settings.map_url?"_blank":undefined} rel="noreferrer"><span>MAP</span><p>{settings.map_url?"Googleマップを開く":"管理画面からGoogleマップURLを設定できます"}</p></a></section>
+    <section className="section access"><div><p className="eyebrow">SHOP INFORMATION</p><h2>店舗情報</h2><dl><dt>店名</dt><dd>{settings.store_name}</dd><dt>営業時間</dt><dd>{settings.business_hours}</dd><dt>定休日</dt><dd>{settings.closed_days}</dd><dt>駐車場</dt><dd>専用駐車場 {settings.parking_capacity}台（要予約）</dd><dt>住所</dt><dd>{settings.address}</dd>{settings.phone&&<><dt>電話</dt><dd>{settings.phone}</dd></>}</dl></div><div className="access-visuals">{exteriorImage&&<div className="access-exterior" style={{backgroundImage:`url(${exteriorImage})`}} role="img" aria-label="お店の外観"/>}<a className="map" href={settings.map_url||undefined} target={settings.map_url?"_blank":undefined} rel="noreferrer"><span>MAP</span><p>{settings.map_url?"Googleマップを開く":"管理画面からGoogleマップURLを設定できます"}</p></a></div></section>
     <AnimalRegistration settings={settings}/>
     <footer><BrandLogo variant="white" label={copy.footer.heading||settings.store_name}/><p>{copy.footer.body}</p><small>© {new Date().getFullYear()} {settings.store_name}</small></footer>
   </main>;

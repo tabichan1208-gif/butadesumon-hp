@@ -10,7 +10,7 @@ export async function deleteLibraryImage(id: string): Promise<ActionResult> {
   if (!supabase) return { ok: false, message: "ログインが切れました。再度ログインしてください。" };
   const [asset, settings, pigs, interior] = await Promise.all([
     supabase.from("media_assets").select("storage_path").eq("id", id).single(),
-    supabase.from("site_settings").select("hero_image_path,hero_mobile_image_path,about_image_path").eq("id", true).single(),
+    supabase.from("site_settings").select("hero_image_path,hero_mobile_image_path,about_image_path,exterior_image_path").eq("id", true).single(),
     supabase.from("pigs").select("name,image_path,published"),
     supabase.from("interior_photos").select("image_path,caption,published"),
   ]);
@@ -211,7 +211,8 @@ export async function uploadLibraryImage(formData:FormData):Promise<ActionResult
 
 export async function chooseSiteImage(formData:FormData):Promise<ActionResult>{
   const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
-  const slot=text(formData,"slot"),path=text(formData,"path");if(!["hero","hero_mobile","about"].includes(slot)||!path)return{ok:false,message:"写真と表示場所を選択してください。"};
-  const column=slot==="hero"?"hero_image_path":slot==="hero_mobile"?"hero_mobile_image_path":"about_image_path";const{error}=await supabase.from("site_settings").update({[column]:path}).eq("id",true);
+  const slot=text(formData,"slot"),path=text(formData,"path");if(!["hero","hero_mobile","about","exterior"].includes(slot)||!path)return{ok:false,message:"写真と表示場所を選択してください。"};
+  const columns={hero:"hero_image_path",hero_mobile:"hero_mobile_image_path",about:"about_image_path",exterior:"exterior_image_path"} as const;
+  const column=columns[slot as keyof typeof columns];const{error}=await supabase.from("site_settings").update({[column]:path}).eq("id",true);
   if(error)return{ok:false,message:"写真を設定できませんでした。"};revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"公開サイトの写真を変更しました。"};
 }
