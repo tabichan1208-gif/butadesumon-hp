@@ -117,15 +117,18 @@
   .admin-app .parking-slots{grid-template-columns:1fr}
 }
 .parking-timeline{margin-top:20px}
-.parking-slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:20px;max-height:480px;overflow:auto}
-.parking-slot{border:1px solid #cad9c8;background:#f3f7f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:6px}
-.parking-slot time{font-size:12px;font-weight:700}
-.parking-slot>strong{color:#49604c;font-size:12px}
-.parking-slot.reserved{background:#f9eae6;border-color:#dab0aa}
-.parking-slot.reserved>strong{color:#984a50}
+.parking-head{align-items:center}
+.parking-summary{min-width:108px;padding:10px 14px;border-radius:12px;background:#edf5eb;color:#36583b;text-align:center}
+.parking-summary strong,.parking-summary span{display:block}.parking-summary strong{font-size:20px}.parking-summary strong small,.parking-summary span{font-size:10px}
+.parking-legend{display:flex;gap:18px;align-items:center;margin-top:16px;font-size:12px;font-weight:700}.parking-legend span{display:flex;align-items:center;gap:6px}.parking-legend i{width:14px;height:14px;border-radius:4px;border:1px solid}.parking-legend .free{background:#edf5eb;border-color:#9fbea1}.parking-legend .busy{background:#b95760;border-color:#98434b}
+.parking-slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin-top:12px;max-height:520px;overflow:auto;padding:2px}
+.parking-slot{min-height:92px;border:2px solid #b7cdb5;border-left-width:7px;background:#f0f7ee;border-radius:10px;padding:11px;display:flex;flex-direction:column;gap:3px}
+.parking-slot-status{display:flex;align-items:center;justify-content:space-between;gap:6px}.parking-slot time{font-size:15px;font-weight:800}.parking-slot-status strong{padding:4px 7px;border-radius:999px;background:#dcebd9;color:#36583b;font-size:10px;white-space:nowrap}.parking-slot-range{color:#70816f;font-size:10px}
+.parking-slot.reserved{background:#b95760;border-color:#98434b;color:white}.parking-slot.reserved .parking-slot-status strong{background:white;color:#8e3640}.parking-slot.reserved .parking-slot-range{color:#fff2f2}
 .parking-slot button{width:100%;text-align:left;border:1px solid #dab0aa;border-radius:8px;background:white;padding:10px;cursor:pointer;margin-top:5px}
 .parking-slot button:hover,.parking-slot button:focus-visible{outline:2px solid var(--rose);outline-offset:2px}
 .parking-slot button b,.parking-slot button small{display:block;font-size:11px;overflow-wrap:anywhere}
+@media(max-width:600px){.parking-head{display:flex;align-items:center}.parking-summary{min-width:92px}.parking-slots{grid-template-columns:repeat(2,minmax(0,1fr));max-height:none}.parking-slot{min-height:88px;padding:10px}.parking-slot time{font-size:14px}.parking-slot-status{align-items:flex-start;flex-direction:column}}
 .image-edit-grid article>b:after{display:block;margin-top:3px;color:var(--muted);font-size:10px;font-weight:400}
 .image-edit-grid article:nth-child(1)>b:after{content:"推奨 1920 × 1080px（横長・16:9）"}
 .image-edit-grid article:nth-child(2)>b:after{content:"推奨 1080 × 1350px（縦長・4:5）"}

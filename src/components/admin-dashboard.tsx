@@ -14,6 +14,15 @@ import { publicImageUrl } from "@/lib/site-content";
 
 const menu = ["予約管理","サイト編集","店舗情報","こぶた紹介","よくある質問","画像ライブラリ","SEO設定"];
 const sourceLabels: Record<string,string> = { WEB:"WEB", PHONE:"電話", WALK_IN:"店頭", OTHER:"その他" };
+const fontOptions = [
+  ["gothic","すっきりゴシック（読みやすい）"],
+  ["modern","モダンゴシック（洗練）"],
+  ["rounded","丸ゴシック（やさしい）"],
+  ["soft-rounded","やわらか丸文字（親しみ）"],
+  ["serif","明朝体（上品）"],
+  ["classic-serif","クラシック明朝（落ち着き）"],
+  ["handwritten","手書き風（温もり）"]
+] as const;
 
 export type AdminReservation = {
   id:string; date:string; time:string; minutes:number; name:string; phone:string; email:string; note:string;
@@ -31,11 +40,11 @@ function localDateString(date = new Date()) {
 export function AdminDashboard({reservations,settings,copy,pigs,faqs,media,interior,interiorError}:{interior:InteriorPhoto[];interiorError:boolean;reservations:AdminReservation[];settings:SiteSettings;copy:SiteCopy;pigs:AdminPig[];faqs:AdminFaq[];media:AdminMedia[]}) {
   const [active,setActive]=useState("予約管理");
   const logout=async()=>{await createClient().auth.signOut();location.href="/admin/login"};
-  const content=active==="予約管理"?<ReservationPanel reservations={reservations}/>:active==="サイト編集"?<div className="cms-stack"><SiteCopyEditor copy={copy} settings={settings} media={media}/><InteriorEditor photos={interior} media={media} loadError={interiorError}/></div>:active==="店舗情報"?<StoreSettingsEditor settings={settings}/>:active==="こぶた紹介"?<PigEditor pigs={pigs} media={media}/>:active==="よくある質問"?<FaqEditor faqs={faqs}/>:active==="画像ライブラリ"?<MediaLibrary media={media} settings={settings} pigs={pigs} interior={interior} interiorError={interiorError}/>:<EditorPlaceholder title={active}/>;
+  const content=active==="予約管理"?<ReservationPanel reservations={reservations} businessHours={settings.business_hours}/>:active==="サイト編集"?<div className="cms-stack"><SiteCopyEditor copy={copy} settings={settings} media={media}/><InteriorEditor photos={interior} media={media} loadError={interiorError}/></div>:active==="店舗情報"?<StoreSettingsEditor settings={settings}/>:active==="こぶた紹介"?<PigEditor pigs={pigs} media={media}/>:active==="よくある質問"?<FaqEditor faqs={faqs}/>:active==="画像ライブラリ"?<MediaLibrary media={media} settings={settings} pigs={pigs} interior={interior} interiorError={interiorError}/>:<EditorPlaceholder title={active}/>;
   return <div className="admin-shell"><aside><div className="admin-brand"><span>MICRO PIG CAFE</span>豚ですもん。<small>管理画面</small></div><nav>{menu.map((m,i)=><button className={active===m?"active":""} onClick={()=>setActive(m)} key={m}><span>{["▦","✎","⌂","♡","?","▧","⌕"][i]}</span>{m}</button>)}</nav><Link href="/">← 公開サイトを見る</Link><button className="logout" onClick={logout}>ログアウト</button></aside><section className="admin-main"><header><div><p>店舗運営</p><h1>{active}</h1></div><div className="admin-user"><span>豚</span><div><b>店舗管理者</b><small>ログイン中</small></div></div></header>{content}</section></div>;
 }
 
-function ReservationPanel({reservations}:{reservations:AdminReservation[]}) {
+function ReservationPanel({reservations,businessHours}:{reservations:AdminReservation[];businessHours:string}) {
   const router=useRouter();
   const [selectedDate,setSelectedDate]=useState(localDateString());
   const [editing,setEditing]=useState<AdminReservation|null|"new">(null);
@@ -54,7 +63,7 @@ function ReservationPanel({reservations}:{reservations:AdminReservation[]}) {
     {notice&&<p className="admin-notice">{notice}</p>}
     <div className="admin-cards"><article><span>予約</span><b>{activeReservations.length}<small>件</small></b><em>選択日の有効な予約</em></article><article><span>ご来店予定</span><b>{totalGuests}<small>名</small></b><em>延べ人数</em></article><article><span>最大同時人数</span><b>{peak}<small>/ 8名</small></b><em>{peak<8?"空きあり":"満員時間あり"}</em></article><article><span>駐車場予約</span><b>{activeReservations.filter(r=>r.parking).length}<small>件</small></b><em>時間の重複を自動防止</em></article></div>
     <div className="admin-reservation-layout"><div className="admin-panel"><div className="panel-head"><div><h2>{formatDate(selectedDate)}の予約</h2><p>キャンセル済みも履歴として残ります</p></div></div><div className="reservation-list">{dayReservations.length===0?<p className="empty-state">この日の予約はありません。</p>:dayReservations.map(r=><button className={`reservation-row${r.status==="CANCELLED"?" cancelled":""}`} key={r.id} onClick={()=>r.status!=="CANCELLED"&&setEditing(r)} disabled={r.status==="CANCELLED"}><time>{r.time}<small>{r.minutes}分</small></time><div className="res-main"><div><span className="source">{sourceLabels[r.source]??r.source}</span>{r.status==="CANCELLED"&&<span className="cancelled-label">キャンセル済み</span>}<h3>{r.name} 様</h3><small>{r.phone}</small>{r.note?.trim()?<div className="reservation-note"><strong>備考</strong><span>{r.note}</span></div>:null}</div><p>人数 <b>{r.guests}名</b></p><p>駐車場 <b>{r.parking?"あり":"なし"}</b></p><span>{r.status==="CANCELLED"?"":"›"}</span></div></button>)}</div></div><Timeline reservations={activeReservations}/></div>
-    <ParkingTimeline reservations={activeReservations} onSelect={setEditing}/>
+    <ParkingTimeline reservations={activeReservations} businessHours={businessHours} onSelect={setEditing}/>
     {editing&&<ReservationEditor reservation={editing==="new"?null:editing} date={selectedDate} pending={pending} onClose={()=>setEditing(null)} onSubmit={submit} onCancel={cancel}/>} 
   </>;
 }
@@ -66,17 +75,25 @@ function ReservationEditor({reservation,date,pending,onClose,onSubmit,onCancel}:
 function Timeline({reservations}:{reservations:AdminReservation[]}) { const slots=timeline(reservations);return <div className="admin-panel timeline-panel"><div className="panel-head"><div><h2>店内タイムライン</h2><p>15分ごとの同時人数と駐車場</p></div></div>{slots.length===0?<p className="empty-state">予約が入ると表示されます。</p>:<div className="timeline-list">{slots.map(s=><div key={s.time}><time>{s.time}</time><span className="occupancy"><i style={{width:`${Math.min(100,s.guests/8*100)}%`}}/></span><b>{s.guests}/8名</b><small>{s.parking?"🚗 使用中":"駐車場 空き"}</small></div>)}</div>}</div> }
 
 function timeline(reservations:AdminReservation[]){if(!reservations.length)return[];const toMinutes=(t:string)=>{const[h,m]=t.split(":").map(Number);return h*60+m};const start=Math.min(...reservations.map(r=>toMinutes(r.time)));const end=Math.max(...reservations.map(r=>toMinutes(r.time)+r.minutes));const slots=[];for(let minute=Math.floor(start/15)*15;minute<end;minute+=15){const current=reservations.filter(r=>{const s=toMinutes(r.time);return s<=minute&&s+r.minutes>minute});slots.push({time:`${String(Math.floor(minute/60)).padStart(2,"0")}:${String(minute%60).padStart(2,"0")}`,guests:current.reduce((n,r)=>n+r.guests,0),parking:current.some(r=>r.parking)})}return slots}
-function ParkingTimeline({reservations,onSelect}:{reservations:AdminReservation[];onSelect:(reservation:AdminReservation)=>void}){
+function ParkingTimeline({reservations,businessHours,onSelect}:{reservations:AdminReservation[];businessHours:string;onSelect:(reservation:AdminReservation)=>void}){
   const active=reservations.filter(r=>r.status!=="CANCELLED");
-  const slots=timeline(active);
   const parking=active.filter(r=>r.parking);
   const minutes=(time:string)=>{const[h,m]=time.split(":").map(Number);return h*60+m};
   const clock=(value:number)=>`${String(Math.floor(value/60)).padStart(2,"0")}:${String(value%60).padStart(2,"0")}`;
-  return <section className="admin-panel parking-timeline"><div className="panel-head"><div><h2>駐車場タイムライン</h2><p>予約のある時間帯を15分ごとに表示。予約者名を押すと詳細が開きます。</p></div></div>{slots.length===0?<p className="empty-state">この日の予約はありません。駐車場の予約もありません。</p>:<div className="parking-slots">{slots.map(slot=>{
-    const start=minutes(slot.time);
+  const hourMatches=businessHours.match(/\d{1,2}:\d{2}/g)??[];
+  const reservationStart=parking.length?Math.min(...parking.map(r=>minutes(r.time))):Infinity;
+  const reservationEnd=parking.length?Math.max(...parking.map(r=>minutes(r.time)+r.minutes)):-Infinity;
+  const opening=hourMatches[0]?minutes(hourMatches[0]):10*60;
+  const closing=hourMatches[1]?minutes(hourMatches[1]):17*60;
+  const rangeStart=Math.floor(Math.min(opening,reservationStart)/15)*15;
+  const rangeEnd=Math.ceil(Math.max(closing,reservationEnd)/15)*15;
+  const slots=[];for(let value=rangeStart;value<rangeEnd;value+=15)slots.push({time:clock(value),start:value});
+  const available=slots.filter(slot=>!parking.some(r=>minutes(r.time)<slot.start+15&&minutes(r.time)+r.minutes>slot.start)).length;
+  return <section className="admin-panel parking-timeline"><div className="panel-head parking-head"><div><h2>駐車場タイムライン</h2><p>営業時間内の空き状況です。予約者名を押すと詳細が開きます。</p></div><div className="parking-summary" aria-label={`全${slots.length}枠中${available}枠が空き`}><strong>{available}<small> / {slots.length}枠</small></strong><span>空き</span></div></div><div className="parking-legend" aria-label="駐車場タイムラインの凡例"><span><i className="free"/>空き</span><span><i className="busy"/>予約あり</span></div><div className="parking-slots">{slots.map(slot=>{
+    const start=slot.start;
     const current=parking.filter(r=>minutes(r.time)<start+15&&minutes(r.time)+r.minutes>start);
-    return <div className={current.length?"parking-slot reserved":"parking-slot"} key={slot.time}><time>{slot.time}〜{clock(start+15)}</time><strong>{current.length?"予約あり":"空き"}</strong><div>{current.map(r=><button type="button" key={r.id} onClick={()=>onSelect(r)} aria-label={`${r.name}様の駐車場予約を開く`}><b>{r.name} 様 ›</b><small>{r.time}〜{clock(minutes(r.time)+r.minutes)}（{r.minutes}分）</small></button>)}</div></div>;
-  })}</div>}</section>;
+    return <div className={current.length?"parking-slot reserved":"parking-slot"} key={slot.time}><div className="parking-slot-status"><time>{slot.time}</time><strong>{current.length?"予約あり":"空き"}</strong></div><small className="parking-slot-range">〜{clock(start+15)}</small>{current.map(r=><button type="button" key={r.id} onClick={()=>onSelect(r)} aria-label={`${r.name}様の駐車場予約を開く`}><b>{r.name} 様 ›</b><small>{r.time}〜{clock(minutes(r.time)+r.minutes)}</small></button>)}</div>;
+  })}</div></section>;
 }
 function formatDate(value:string){const[y,m,d]=value.split("-");return `${y}年${Number(m)}月${Number(d)}日`}
 function SiteCopyEditor({copy,settings,media}:{copy:SiteCopy;settings:SiteSettings;media:AdminMedia[]}){
@@ -93,7 +110,15 @@ function SiteCopyEditor({copy,settings,media}:{copy:SiteCopy;settings:SiteSettin
 function StoreSettingsEditor({settings}:{settings:SiteSettings}){
   const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");
   const submit=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const data=new FormData(e.currentTarget);startTransition(async()=>{const result=await saveSiteSettings(data);setNotice(result.message);if(result.ok)router.refresh()})};
-  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<form className="admin-panel cms-form" onSubmit={submit}><div className="panel-head"><div><h2>店舗情報</h2><p>公開サイトの店舗情報へ反映されます</p></div><button className="button" disabled={pending}>{pending?"保存中…":"変更を保存"}</button></div><div className="settings-fields"><label>店名<input name="store_name" defaultValue={settings.store_name} required/></label><label>キャッチコピー<input name="tagline" defaultValue={settings.tagline}/></label><label>営業時間<input name="business_hours" defaultValue={settings.business_hours}/></label><label>定休日<input name="closed_days" defaultValue={settings.closed_days}/></label><label>住所<input name="address" defaultValue={settings.address}/></label><label>電話番号<input name="phone" defaultValue={settings.phone}/></label><label className="wide">GoogleマップURL<input name="map_url" type="url" defaultValue={settings.map_url}/></label></div><hr/><div className="panel-head"><div><h2>第一種動物取扱業の登録情報</h2><p>登録証が届くまでは空欄・非公開で保存できます。公開前に共通情報と種別ごとの登録番号を登録証と照合してください。</p></div></div><div className="settings-fields"><label className="wide registration-publish"><span><input type="checkbox" name="animal_registration_published" defaultChecked={settings.animal_registration_published??false}/> 登録情報を公開する</span></label><label>登録者の氏名または名称<input name="animal_registrant" defaultValue={settings.animal_registrant??""}/></label><label>事業所の名称<input name="animal_business_name" defaultValue={settings.animal_business_name??""}/></label><label>事業所の所在地<input name="animal_business_address" defaultValue={settings.animal_business_address??""}/></label><RegistrationRowsEditor settings={settings}/><label>登録年月日<input name="animal_registration_date" defaultValue={settings.animal_registration_date??""}/></label><label>有効期間の末日<input name="animal_registration_expiry" defaultValue={settings.animal_registration_expiry??""}/></label><label>動物取扱責任者氏名<input name="animal_responsible_person" defaultValue={settings.animal_responsible_person??""}/></label></div><hr/><div className="panel-head"><div><h2>フォントと色</h2><p>サイト全体・見出し・英字見出しを調整できます</p></div></div><div className="settings-fields"><label>本文フォント<select name="font_family" defaultValue={settings.font_family}><option value="gothic">ゴシック体</option><option value="serif">明朝体</option><option value="rounded">丸ゴシック体</option></select></label><label>本文サイズ<input name="base_font_size" type="number" min="12" max="24" defaultValue={settings.base_font_size}/></label><label>見出しフォント<select name="heading_font_family" defaultValue={settings.heading_font_family}><option value="serif">明朝体</option><option value="gothic">ゴシック体</option><option value="rounded">丸ゴシック体</option></select></label><label>見出しサイズ<input name="heading_font_size" type="number" min="24" max="80" defaultValue={settings.heading_font_size}/></label><label>英字見出しサイズ<input name="eyebrow_font_size" type="number" min="8" max="20" defaultValue={settings.eyebrow_font_size}/></label><label>メインカラー<input name="primary_color" type="color" defaultValue={settings.primary_color}/></label><label>背景色<input name="background_color" type="color" defaultValue={settings.background_color}/></label></div><button className="button cms-save" disabled={pending}>変更を保存</button></form></div>;
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<form className="admin-panel cms-form" onSubmit={submit}>
+    <div className="panel-head"><div><h2>店舗情報</h2><p>公開サイトの店舗情報へ反映されます</p></div><button className="button" disabled={pending}>{pending?"保存中…":"変更を保存"}</button></div>
+    <div className="settings-fields"><label>店名<input name="store_name" defaultValue={settings.store_name} required/></label><label>キャッチコピー<input name="tagline" defaultValue={settings.tagline}/></label><label>営業時間<input name="business_hours" defaultValue={settings.business_hours}/></label><label>定休日<input name="closed_days" defaultValue={settings.closed_days}/></label><label>住所<input name="address" defaultValue={settings.address}/></label><label>電話番号<input name="phone" defaultValue={settings.phone}/></label><label className="wide">GoogleマップURL<input name="map_url" type="url" defaultValue={settings.map_url}/></label></div>
+    <hr/><div className="panel-head"><div><h2>第一種動物取扱業の登録情報</h2><p>登録証が届くまでは空欄・非公開で保存できます。公開前に共通情報と種別ごとの登録番号を登録証と照合してください。</p></div></div>
+    <div className="settings-fields"><label className="wide registration-publish"><span><input type="checkbox" name="animal_registration_published" defaultChecked={settings.animal_registration_published??false}/> 登録情報を公開する</span></label><label>登録者の氏名または名称<input name="animal_registrant" defaultValue={settings.animal_registrant??""}/></label><label>事業所の名称<input name="animal_business_name" defaultValue={settings.animal_business_name??""}/></label><label>事業所の所在地<input name="animal_business_address" defaultValue={settings.animal_business_address??""}/></label><RegistrationRowsEditor settings={settings}/><label>登録年月日<input name="animal_registration_date" defaultValue={settings.animal_registration_date??""}/></label><label>有効期間の末日<input name="animal_registration_expiry" defaultValue={settings.animal_registration_expiry??""}/></label><label>動物取扱責任者氏名<input name="animal_responsible_person" defaultValue={settings.animal_responsible_person??""}/></label></div>
+    <hr/><div className="panel-head"><div><h2>フォントと色</h2><p>雰囲気の説明を参考に、本文と見出しを別々に選べます</p></div></div>
+    <div className="settings-fields"><label>本文フォント<select name="font_family" defaultValue={settings.font_family}>{fontOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label>本文サイズ<input name="base_font_size" type="number" min="12" max="24" defaultValue={settings.base_font_size}/></label><label>見出しフォント<select name="heading_font_family" defaultValue={settings.heading_font_family}>{fontOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label>見出しサイズ<input name="heading_font_size" type="number" min="24" max="80" defaultValue={settings.heading_font_size}/></label><label>英字見出しサイズ<input name="eyebrow_font_size" type="number" min="8" max="20" defaultValue={settings.eyebrow_font_size}/></label><label>メインカラー<input name="primary_color" type="color" defaultValue={settings.primary_color}/></label><label>背景色<input name="background_color" type="color" defaultValue={settings.background_color}/></label></div>
+    <button className="button cms-save" disabled={pending}>変更を保存</button>
+  </form></div>;
 }
 
 function PigEditor({pigs,media}:{pigs:AdminPig[];media:AdminMedia[]}){

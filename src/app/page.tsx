@@ -7,7 +7,15 @@ import { faqs as fallbackFaqs } from "@/lib/mock-data";
 import { createClient } from "@/lib/supabase/server";
 import { defaultCopy, defaultSettings, publicImageUrl } from "@/lib/site-content";
 
-const fontMap={gothic:'"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif',serif:'"Yu Mincho","Hiragino Mincho ProN",serif',rounded:'"Hiragino Maru Gothic ProN","Yu Gothic",sans-serif'};
+const fontMap={
+  gothic:'"Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",sans-serif',
+  modern:'Avenir,"Avenir Next","Helvetica Neue","Yu Gothic",sans-serif',
+  rounded:'"Hiragino Maru Gothic ProN","Yu Gothic","Noto Sans JP",sans-serif',
+  "soft-rounded":'"Tsukushi A Round Gothic","Hiragino Maru Gothic ProN","Yu Gothic",sans-serif',
+  serif:'"Yu Mincho","Hiragino Mincho ProN","Noto Serif JP",serif',
+  "classic-serif":'"Hiragino Mincho ProN","YuMincho","Yu Mincho",serif',
+  handwritten:'Klee,"Klee One",YuKyokasho,"Yu Kyokasho","Hiragino Mincho ProN",serif'
+};
 
 export default async function Home(){
   const supabase=await createClient();
