@@ -65,6 +65,7 @@ function text(formData: FormData, key: string) {
 function messageFor(error: string) {
   if (error.includes("CAPACITY_EXCEEDED")) return "同じ時間帯の店内人数が8名を超えるため保存できません。";
   if (error.includes("PARKING_UNAVAILABLE")) return "同じ時間帯に駐車場を利用する予約があります。";
+  if (error.includes("reservations_business_hours")) return "予約は11:00〜18:00の滞在時間内で登録してください。";
   if (error.includes("INVALID_RESERVATION")) return "入力内容を確認してください。";
   if (error.includes("permission denied")) return "予約機能の権限設定を確認してください。";
   return "予約を保存できませんでした。もう一度お試しください。";
