@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseRegistrationEntries } from "@/lib/animal-registrations";
 import { mediaUsage } from "@/lib/media-usage";
+import type { EmailSettings } from "@/lib/email-settings";
 
 export async function deleteLibraryImage(id: string): Promise<ActionResult> {
   const supabase = await getStaffClient();
@@ -70,6 +71,26 @@ function messageFor(error: string) {
   if (error.includes("INVALID_RESERVATION")) return "入力内容を確認してください。";
   if (error.includes("permission denied")) return "予約機能の権限設定を確認してください。";
   return "予約を保存できませんでした。もう一度お試しください。";
+}
+
+export async function saveEmailSettings(formData:FormData):Promise<ActionResult>{
+  const supabase=await getStaffClient();
+  if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const payload:Omit<EmailSettings,"store_notification_email">&{store_notification_email:string}={
+    customer_email_enabled:formData.get("customer_email_enabled")==="on",
+    customer_subject:text(formData,"customer_subject"),
+    customer_body:text(formData,"customer_body"),
+    store_email_enabled:formData.get("store_email_enabled")==="on",
+    store_notification_email:text(formData,"store_notification_email"),
+    store_subject:text(formData,"store_subject"),
+    store_body:text(formData,"store_body")
+  };
+  if(!payload.customer_subject||!payload.customer_body||!payload.store_subject||!payload.store_body)return{ok:false,message:"件名と本文を入力してください。"};
+  if(payload.store_email_enabled&&!/^\S+@\S+\.\S+$/.test(payload.store_notification_email))return{ok:false,message:"店舗通知をONにする場合は、通知先メールアドレスを入力してください。"};
+  const{error}=await supabase.from("email_settings").upsert({id:true,...payload},{onConflict:"id"});
+  if(error)return{ok:false,message:"メール設定を保存できませんでした。メール設定用のSQLを適用してから、もう一度お試しください。"};
+  revalidatePath("/admin");
+  return{ok:true,message:"メール設定を保存しました。Gmail接続までは自動送信されません。"};
 }
 
 export async function saveReservation(formData: FormData): Promise<ActionResult> {

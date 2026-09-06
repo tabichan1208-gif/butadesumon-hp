@@ -7,12 +7,13 @@ import { RegistrationRowsEditor } from "./registration-rows-editor";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { cancelReservation, deletePig, deleteLibraryImage, chooseSiteImage, saveFaq, savePig, saveReservation, saveSiteCopy, saveSiteSettings } from "@/app/admin/actions";
+import { cancelReservation, deletePig, deleteLibraryImage, chooseSiteImage, saveEmailSettings, saveFaq, savePig, saveReservation, saveSiteCopy, saveSiteSettings } from "@/app/admin/actions";
 import type { SiteCopy, SiteSettings } from "@/lib/site-content";
+import type { EmailSettings } from "@/lib/email-settings";
 import { mediaUsage } from "@/lib/media-usage";
 import { publicImageUrl } from "@/lib/site-content";
 
-const menu = ["予約管理","サイト編集","店舗情報","こぶた紹介","よくある質問","画像ライブラリ","SEO設定"];
+const menu = ["予約管理","メール設定","サイト編集","店舗情報","こぶた紹介","よくある質問","画像ライブラリ","SEO設定"];
 const sourceLabels: Record<string,string> = { WEB:"WEB", PHONE:"電話", WALK_IN:"店頭", OTHER:"その他" };
 const fontOptions = [
   ["gothic","すっきりゴシック（読みやすい）"],
@@ -37,11 +38,24 @@ function localDateString(date = new Date()) {
   return new Date(date.getTime() - offset).toISOString().slice(0,10);
 }
 
-export function AdminDashboard({reservations,settings,copy,pigs,faqs,media,interior,interiorError}:{interior:InteriorPhoto[];interiorError:boolean;reservations:AdminReservation[];settings:SiteSettings;copy:SiteCopy;pigs:AdminPig[];faqs:AdminFaq[];media:AdminMedia[]}) {
+export function AdminDashboard({reservations,settings,emailSettings,copy,pigs,faqs,media,interior,interiorError}:{interior:InteriorPhoto[];interiorError:boolean;reservations:AdminReservation[];settings:SiteSettings;emailSettings:EmailSettings;copy:SiteCopy;pigs:AdminPig[];faqs:AdminFaq[];media:AdminMedia[]}) {
   const [active,setActive]=useState("予約管理");
   const logout=async()=>{await createClient().auth.signOut();location.href="/admin/login"};
-  const content=active==="予約管理"?<ReservationPanel reservations={reservations} businessHours={settings.business_hours}/>:active==="サイト編集"?<div className="cms-stack"><SiteCopyEditor copy={copy} settings={settings} media={media}/><InteriorEditor photos={interior} media={media} loadError={interiorError}/></div>:active==="店舗情報"?<StoreSettingsEditor settings={settings}/>:active==="こぶた紹介"?<PigEditor pigs={pigs} media={media}/>:active==="よくある質問"?<FaqEditor faqs={faqs}/>:active==="画像ライブラリ"?<MediaLibrary media={media} settings={settings} pigs={pigs} interior={interior} interiorError={interiorError}/>:<EditorPlaceholder title={active}/>;
-  return <div className="admin-shell"><aside><div className="admin-brand"><span>MICRO PIG CAFE</span>豚ですもん。<small>管理画面</small></div><nav>{menu.map((m,i)=><button className={active===m?"active":""} onClick={()=>setActive(m)} key={m}><span>{["▦","✎","⌂","♡","?","▧","⌕"][i]}</span>{m}</button>)}</nav><Link href="/">← 公開サイトを見る</Link><button className="logout" onClick={logout}>ログアウト</button></aside><section className="admin-main"><header><div><p>店舗運営</p><h1>{active}</h1></div><div className="admin-user"><span>豚</span><div><b>店舗管理者</b><small>ログイン中</small></div></div></header>{content}</section></div>;
+  const content=active==="予約管理"?<ReservationPanel reservations={reservations} businessHours={settings.business_hours}/>:active==="メール設定"?<EmailSettingsEditor settings={emailSettings}/>:active==="サイト編集"?<div className="cms-stack"><SiteCopyEditor copy={copy} settings={settings} media={media}/><InteriorEditor photos={interior} media={media} loadError={interiorError}/></div>:active==="店舗情報"?<StoreSettingsEditor settings={settings}/>:active==="こぶた紹介"?<PigEditor pigs={pigs} media={media}/>:active==="よくある質問"?<FaqEditor faqs={faqs}/>:active==="画像ライブラリ"?<MediaLibrary media={media} settings={settings} pigs={pigs} interior={interior} interiorError={interiorError}/>:<EditorPlaceholder title={active}/>;
+  return <div className="admin-shell"><aside><div className="admin-brand"><span>MICRO PIG CAFE</span>豚ですもん。<small>管理画面</small></div><nav>{menu.map((m,i)=><button className={active===m?"active":""} onClick={()=>setActive(m)} key={m}><span>{["▦","✉","✎","⌂","♡","?","▧","⌕"][i]}</span>{m}</button>)}</nav><Link href="/">← 公開サイトを見る</Link><button className="logout" onClick={logout}>ログアウト</button></aside><section className="admin-main"><header><div><p>店舗運営</p><h1>{active}</h1></div><div className="admin-user"><span>豚</span><div><b>店舗管理者</b><small>ログイン中</small></div></div></header>{content}</section></div>;
+}
+
+function EmailSettingsEditor({settings}:{settings:EmailSettings}){
+  const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");
+  const submit=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const data=new FormData(e.currentTarget);startTransition(async()=>{const result=await saveEmailSettings(data);setNotice(result.message);if(result.ok)router.refresh()})};
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<form className="admin-panel cms-form email-settings-form" onSubmit={submit}>
+    <div className="panel-head"><div><h2>予約メール</h2><p>Gmailの接続後に、ここで設定した内容を自動送信します。</p></div><button className="button" disabled={pending}>{pending?"保存中…":"設定を保存"}</button></div>
+    <div className="email-setup-note"><strong>現在は送信準備中です</strong><p>Gmailアドレスとアプリパスワードは後日Vercelに登録します。ここにパスワードを入力する必要はありません。</p></div>
+    <fieldset><legend>予約者様への受付完了メール</legend><label className="publish-check"><input name="customer_email_enabled" type="checkbox" defaultChecked={settings.customer_email_enabled}/> Gmail接続後、自動送信する</label><label>件名<input name="customer_subject" maxLength={200} defaultValue={settings.customer_subject} required/></label><label>本文<textarea name="customer_body" rows={13} maxLength={10000} defaultValue={settings.customer_body} required/></label></fieldset>
+    <fieldset><legend>店舗への新規予約通知</legend><label className="publish-check"><input name="store_email_enabled" type="checkbox" defaultChecked={settings.store_email_enabled}/> Gmail接続後、店舗にも通知する</label><label>通知先メールアドレス<input name="store_notification_email" type="email" maxLength={320} defaultValue={settings.store_notification_email} placeholder="例：shop@example.com"/></label><label>件名<input name="store_subject" maxLength={200} defaultValue={settings.store_subject} required/></label><label>本文<textarea name="store_body" rows={14} maxLength={10000} defaultValue={settings.store_body} required/></label></fieldset>
+    <aside className="email-tags"><strong>予約内容の差し込み項目</strong><p>件名・本文の好きな場所に、そのまま入力できます。</p><code>{"{{予約番号}}　{{お名前}}　{{来店日}}　{{開始時間}}　{{利用時間}}　{{人数}}　{{駐車場}}　{{電話番号}}　{{メール}}　{{備考}}"}</code></aside>
+    <button className="button cms-save" disabled={pending}>{pending?"保存中…":"設定を保存"}</button>
+  </form></div>;
 }
 
 function ReservationPanel({reservations,businessHours}:{reservations:AdminReservation[];businessHours:string}) {
