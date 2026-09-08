@@ -75,4 +75,4 @@ export default async function Home(){
 
 function lines(value:string){const parts=value.split("\n");return parts.map((line,index)=><span key={`${line}-${index}`}>{line}{index<parts.length-1&&<br/>}</span>)}
 function normalizeBreaks(value:string){return value.replace(/\\n/g,"\n")}
-function pricingTone(label:string){const normalized=label.replace(/[～〜−ー―]/g,"-");if(normalized.includes("3-12")||normalized.includes("3歳")||normalized.includes("子ども"))return"child";if(normalized.includes("13歳")||normalized.includes("大人"))return"adult";return"extra"}
+function pricingTone(label:string){const normalized=label.replace(/[～〜−ー―]/g,"-");if(normalized.includes("13歳")||normalized.includes("大人"))return"adult";if(normalized.includes("3-12歳")||normalized.includes("子ども"))return"child";return"extra"}
