@@ -173,3 +173,5 @@
 
 /* Compact visit-guide cards on phones */
 @media(max-width:600px){.dark-guide{padding-top:52px;padding-bottom:52px}.dark-guide .section-heading{margin-bottom:24px}.dark-guide .guide-grid{gap:9px}.dark-guide .guide-grid article{padding:14px 17px}.dark-guide .guide-grid b{font-size:17px;line-height:1}.dark-guide .guide-grid h3{margin:3px 0 2px;font-size:18px;line-height:1.35}.dark-guide .guide-grid p{margin:0;font-size:12px;line-height:1.6}}
+.guide-title{display:flex;align-items:center;gap:14px;margin-bottom:12px}.guide-title h3{margin:0}.guide-title b{flex:0 0 auto;line-height:1}
+@media(max-width:600px){.dark-guide .guide-title{gap:10px;margin-bottom:5px}.dark-guide .guide-title h3{margin:0}}
