@@ -11,7 +11,7 @@ export type SiteSettings = {
   animal_registration_date:string;
   animal_registration_expiry:string;
   animal_responsible_person:string;
-  store_name:string; tagline:string; business_hours:string; closed_days:string; address:string; phone:string;
+  store_name:string; tagline:string; business_hours:string; closed_days:string; address:string; phone:string;instagram_url:string;
   parking_capacity:number; primary_color:string; background_color:string; font_family:string; base_font_size:number;
   heading_font_family:string; heading_font_size:number; eyebrow_font_size:number;
   hero_image_path:string; hero_mobile_image_path:string; about_image_path:string; exterior_image_path:string; map_url:string;
@@ -32,7 +32,7 @@ export const defaultSettings:SiteSettings={
   animal_registration_expiry:"",
   animal_responsible_person:"",
   store_name:"豚ですもん。",tagline:"こぶたと過ごす、やさしい時間。",business_hours:"11:00〜18:00",closed_days:"毎週月曜日",
-  address:"愛知県安城市",phone:"",parking_capacity:1,primary_color:"#87533f",background_color:"#fbf7f1",font_family:"gothic",base_font_size:16,
+  address:"愛知県安城市",phone:"",instagram_url:"",parking_capacity:1,primary_color:"#87533f",background_color:"#fbf7f1",font_family:"gothic",base_font_size:16,
   heading_font_family:"serif",heading_font_size:48,eyebrow_font_size:11,hero_image_path:"",hero_mobile_image_path:"",about_image_path:"",exterior_image_path:"",map_url:"",
   seo_title:"豚ですもん。｜マイクロブタカフェ",seo_description:"マイクロブタさんと、のんびりやさしい時間を。愛知県安城市のふれあいカフェ「豚ですもん。」",seo_keywords:"マイクロブタカフェ,マイクロブタ,愛知県,安城市,豚ですもん",seo_canonical_url:"",seo_image_path:"",seo_indexing_enabled:true
 };

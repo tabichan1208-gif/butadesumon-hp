@@ -141,6 +141,8 @@ export async function saveSiteSettings(formData:FormData):Promise<ActionResult>{
   catch { return {ok:false,message:"登録番号の入力形式を確認してください。画面を更新して再度入力してください。"}; }
   if(!registrations)return {ok:false,message:"登録番号の形式・文字数・行数を確認してください。"};
   const entries=registrations.filter(row=>row.type||row.number);
+  const instagramUrl=text(formData,"instagram_url");
+  if(instagramUrl&&!/^https:\/\/(www\.)?instagram\.com\/[^\s]+$/i.test(instagramUrl))return{ok:false,message:"Instagram URLは https://www.instagram.com/ から始まるURLを入力してください。"};
   const payload={
     animal_registrations:entries,
     animal_registration_published:formData.get("animal_registration_published")==="on",
@@ -153,7 +155,7 @@ export async function saveSiteSettings(formData:FormData):Promise<ActionResult>{
     animal_registration_expiry:text(formData,"animal_registration_expiry"),
     animal_responsible_person:text(formData,"animal_responsible_person"),
     store_name:text(formData,"store_name"),tagline:text(formData,"tagline"),business_hours:text(formData,"business_hours"),
-    closed_days:text(formData,"closed_days"),address:text(formData,"address"),phone:text(formData,"phone")||null,
+    closed_days:text(formData,"closed_days"),address:text(formData,"address"),phone:text(formData,"phone")||null,instagram_url:instagramUrl||null,
     map_url:text(formData,"map_url")||null,primary_color:text(formData,"primary_color"),background_color:text(formData,"background_color"),
     font_family:text(formData,"font_family"),base_font_size:Number(formData.get("base_font_size")),
     heading_font_family:text(formData,"heading_font_family"),heading_font_size:Number(formData.get("heading_font_size")),
