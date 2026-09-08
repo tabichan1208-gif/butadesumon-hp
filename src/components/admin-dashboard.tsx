@@ -7,13 +7,14 @@ import { RegistrationRowsEditor } from "./registration-rows-editor";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { cancelReservation, deletePig, deleteLibraryImage, chooseSiteImage, saveEmailSettings, saveFaq, savePig, saveReservation, saveSeoSettings, saveSiteCopy, saveSiteSettings } from "@/app/admin/actions";
+import { cancelReservation, deletePig, deleteLibraryImage, deletePricingItem, chooseSiteImage, saveEmailSettings, saveFaq, savePig, savePricingItem, savePricingSettings, saveReservation, saveSeoSettings, saveSiteCopy, saveSiteSettings } from "@/app/admin/actions";
 import type { SiteCopy, SiteSettings } from "@/lib/site-content";
 import type { EmailSettings } from "@/lib/email-settings";
+import type { PricingItem, PricingSettings } from "@/lib/pricing";
 import { mediaUsage } from "@/lib/media-usage";
 import { publicImageUrl } from "@/lib/site-content";
 
-const menu = ["予約管理","メール設定","サイト編集","店舗情報","こぶた紹介","よくある質問","画像ライブラリ","SEO設定"];
+const menu = ["予約管理","メール設定","サイト編集","店舗情報","ご利用料金","こぶた紹介","よくある質問","画像ライブラリ","SEO設定"];
 const sourceLabels: Record<string,string> = { WEB:"WEB", PHONE:"電話", WALK_IN:"店頭", OTHER:"その他" };
 const fontOptions = [
   ["gothic","すっきりゴシック（読みやすい）"],
@@ -38,11 +39,11 @@ function localDateString(date = new Date()) {
   return new Date(date.getTime() - offset).toISOString().slice(0,10);
 }
 
-export function AdminDashboard({reservations,settings,emailSettings,copy,pigs,faqs,media,interior,interiorError}:{interior:InteriorPhoto[];interiorError:boolean;reservations:AdminReservation[];settings:SiteSettings;emailSettings:EmailSettings;copy:SiteCopy;pigs:AdminPig[];faqs:AdminFaq[];media:AdminMedia[]}) {
+export function AdminDashboard({reservations,settings,emailSettings,pricingSettings,pricingItems,copy,pigs,faqs,media,interior,interiorError}:{interior:InteriorPhoto[];interiorError:boolean;reservations:AdminReservation[];settings:SiteSettings;emailSettings:EmailSettings;pricingSettings:PricingSettings;pricingItems:PricingItem[];copy:SiteCopy;pigs:AdminPig[];faqs:AdminFaq[];media:AdminMedia[]}) {
   const [active,setActive]=useState("予約管理");
   const logout=async()=>{await createClient().auth.signOut();location.href="/admin/login"};
-  const content=active==="予約管理"?<ReservationPanel reservations={reservations} businessHours={settings.business_hours}/>:active==="メール設定"?<EmailSettingsEditor settings={emailSettings}/>:active==="サイト編集"?<div className="cms-stack"><SiteCopyEditor copy={copy} settings={settings} media={media}/><InteriorEditor photos={interior} media={media} loadError={interiorError}/></div>:active==="店舗情報"?<StoreSettingsEditor settings={settings}/>:active==="こぶた紹介"?<PigEditor pigs={pigs} media={media}/>:active==="よくある質問"?<FaqEditor faqs={faqs}/>:active==="画像ライブラリ"?<MediaLibrary media={media} settings={settings} pigs={pigs} interior={interior} interiorError={interiorError}/>:<SeoSettingsEditor settings={settings} media={media}/>;
-  return <div className="admin-shell"><aside><div className="admin-brand"><span>MICRO PIG CAFE</span>豚ですもん。<small>管理画面</small></div><nav>{menu.map((m,i)=><button className={active===m?"active":""} onClick={()=>setActive(m)} key={m}><span>{["▦","✉","✎","⌂","♡","?","▧","⌕"][i]}</span>{m}</button>)}</nav><Link href="/">← 公開サイトを見る</Link><button className="logout" onClick={logout}>ログアウト</button></aside><section className="admin-main"><header><div><p>店舗運営</p><h1>{active}</h1></div><div className="admin-user"><span>豚</span><div><b>店舗管理者</b><small>ログイン中</small></div></div></header>{content}</section></div>;
+  const content=active==="予約管理"?<ReservationPanel reservations={reservations} businessHours={settings.business_hours}/>:active==="メール設定"?<EmailSettingsEditor settings={emailSettings}/>:active==="サイト編集"?<div className="cms-stack"><SiteCopyEditor copy={copy} settings={settings} media={media}/><InteriorEditor photos={interior} media={media} loadError={interiorError}/></div>:active==="店舗情報"?<StoreSettingsEditor settings={settings}/>:active==="ご利用料金"?<PricingEditor settings={pricingSettings} items={pricingItems}/>:active==="こぶた紹介"?<PigEditor pigs={pigs} media={media}/>:active==="よくある質問"?<FaqEditor faqs={faqs}/>:active==="画像ライブラリ"?<MediaLibrary media={media} settings={settings} pigs={pigs} interior={interior} interiorError={interiorError}/>:<SeoSettingsEditor settings={settings} media={media}/>;
+  return <div className="admin-shell"><aside><div className="admin-brand"><span>MICRO PIG CAFE</span>豚ですもん。<small>管理画面</small></div><nav>{menu.map((m,i)=><button className={active===m?"active":""} onClick={()=>setActive(m)} key={m}><span>{["▦","✉","✎","⌂","¥","♡","?","▧","⌕"][i]}</span>{m}</button>)}</nav><Link href="/">← 公開サイトを見る</Link><button className="logout" onClick={logout}>ログアウト</button></aside><section className="admin-main"><header><div><p>店舗運営</p><h1>{active}</h1></div><div className="admin-user"><span>豚</span><div><b>店舗管理者</b><small>ログイン中</small></div></div></header>{content}</section></div>;
 }
 
 function EmailSettingsEditor({settings}:{settings:EmailSettings}){
@@ -147,6 +148,17 @@ function StoreSettingsEditor({settings}:{settings:SiteSettings}){
     <div className="settings-fields"><label>本文フォント<select name="font_family" defaultValue={settings.font_family}>{fontOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label>本文サイズ<input name="base_font_size" type="number" min="12" max="24" defaultValue={settings.base_font_size}/></label><label>見出しフォント<select name="heading_font_family" defaultValue={settings.heading_font_family}>{fontOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label>見出しサイズ<input name="heading_font_size" type="number" min="24" max="80" defaultValue={settings.heading_font_size}/></label><label>英字見出しサイズ<input name="eyebrow_font_size" type="number" min="8" max="20" defaultValue={settings.eyebrow_font_size}/></label><label>メインカラー<input name="primary_color" type="color" defaultValue={settings.primary_color}/></label><label>背景色<input name="background_color" type="color" defaultValue={settings.background_color}/></label></div>
     <button className="button cms-save" disabled={pending}>変更を保存</button>
   </form></div>;
+}
+
+function PricingEditor({settings,items}:{settings:PricingSettings;items:PricingItem[]}){
+  const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");
+  const run=(action:(data:FormData)=>Promise<{ok:boolean;message:string}>)=>(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);startTransition(async()=>{const result=await action(data);setNotice(result.message);if(result.ok){if(action===savePricingItem&&!data.get("id"))form.reset();router.refresh()}})};
+  const remove=(item:PricingItem)=>{if(!window.confirm(`「${item.label}」を削除しますか？`))return;startTransition(async()=>{const result=await deletePricingItem(item.id);setNotice(result.message);if(result.ok)router.refresh()})};
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<form className="admin-panel cms-form" onSubmit={run(savePricingSettings)}><div className="panel-head"><div><h2>料金コーナー</h2><p>公開サイトの「ご利用案内」と「オンライン予約」の間に表示されます。</p></div><button className="button" disabled={pending}>設定を保存</button></div><div className="settings-fields"><label className="wide registration-publish"><span><input name="published" type="checkbox" defaultChecked={settings.published}/> 料金コーナーを公開する</span></label><label className="wide">見出し<textarea name="heading" rows={2} maxLength={100} defaultValue={settings.heading} required/></label><label className="wide">案内文<textarea name="description" rows={3} maxLength={1000} defaultValue={settings.description}/></label><label className="wide">コーナー下部の注意書き<textarea name="note" rows={3} maxLength={1000} defaultValue={settings.note}/></label></div><button className="button cms-save" disabled={pending}>設定を保存</button></form><section className="admin-panel"><div className="panel-head"><div><h2>料金項目</h2><p>「大人」「子ども」など、必要な数だけ追加できます。</p></div></div><div className="manager-list"><PricingItemForm pending={pending} onSubmit={run(savePricingItem)}/>{items.map(item=><PricingItemForm key={item.id} item={item} pending={pending} onSubmit={run(savePricingItem)} onDelete={()=>remove(item)}/>)}</div></section></div>;
+}
+
+function PricingItemForm({item,pending,onSubmit,onDelete}:{item?:PricingItem;pending:boolean;onSubmit:(e:FormEvent<HTMLFormElement>)=>void;onDelete?:()=>void}){
+  return <form className="manager-card pricing-manager" onSubmit={onSubmit}><div className="manager-fields"><input name="id" type="hidden" value={item?.id??""}/><label>料金区分<input name="label" maxLength={100} defaultValue={item?.label??""} placeholder="例：13歳以上" required/></label><label>表示する金額<input name="price" maxLength={100} defaultValue={item?.price??""} placeholder="例：30分 1,000円" required/></label><label className="wide">補足<textarea name="description" rows={2} maxLength={500} defaultValue={item?.description??""} placeholder="例：延長15分ごとに500円"/></label><label>表示順<input name="sort_order" type="number" defaultValue={item?.sort_order??0}/></label><label className="publish-check"><input name="published" type="checkbox" defaultChecked={item?.published??true}/> 公開する</label></div><div className="pig-form-actions"><button className="button" disabled={pending}>{item?"変更を保存":"＋ 料金項目を追加"}</button>{item&&onDelete&&<button className="media-delete" type="button" disabled={pending} onClick={onDelete}>削除する</button>}</div></form>;
 }
 
 function PigEditor({pigs,media}:{pigs:AdminPig[];media:AdminMedia[]}){

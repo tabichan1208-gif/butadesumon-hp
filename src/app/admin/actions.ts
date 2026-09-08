@@ -235,6 +235,31 @@ export async function saveFaq(formData:FormData):Promise<ActionResult>{
   if(error)return{ok:false,message:"よくある質問を保存できませんでした。"};revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"よくある質問を保存しました。"};
 }
 
+export async function savePricingSettings(formData:FormData):Promise<ActionResult>{
+  const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const payload={heading:text(formData,"heading"),description:text(formData,"description"),note:text(formData,"note"),published:formData.get("published")==="on"};
+  if(!payload.heading||payload.heading.length>100||payload.description.length>1000||payload.note.length>1000)return{ok:false,message:"見出し・案内文・注意書きの文字数を確認してください。"};
+  const{error}=await supabase.from("pricing_settings").upsert({id:true,...payload},{onConflict:"id"});
+  if(error)return{ok:false,message:"料金コーナーを保存できませんでした。料金用のSQLを適用してください。"};
+  revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"料金コーナーの設定を保存しました。"};
+}
+
+export async function savePricingItem(formData:FormData):Promise<ActionResult>{
+  const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const id=text(formData,"id"),payload={label:text(formData,"label"),price:text(formData,"price"),description:text(formData,"description")||null,sort_order:Number(formData.get("sort_order"))||0,published:formData.get("published")==="on"};
+  if(!payload.label||!payload.price||payload.label.length>100||payload.price.length>100||(payload.description?.length??0)>500)return{ok:false,message:"料金区分・金額・補足の内容を確認してください。"};
+  const result=id?await supabase.from("pricing_items").update(payload).eq("id",id).select("id"):await supabase.from("pricing_items").insert(payload).select("id");
+  if(result.error||!result.data?.length)return{ok:false,message:"料金項目を保存できませんでした。"};
+  revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"料金項目を保存しました。"};
+}
+
+export async function deletePricingItem(id:string):Promise<ActionResult>{
+  const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const{data,error}=await supabase.from("pricing_items").delete().eq("id",id).select("id");
+  if(error||!data?.length)return{ok:false,message:"料金項目を削除できませんでした。"};
+  revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"料金項目を削除しました。"};
+}
+
 export async function uploadLibraryImage(formData:FormData):Promise<ActionResult>{
   const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
   const files=formData.getAll("images").filter((item):item is File=>item instanceof File&&item.size>0);
