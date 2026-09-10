@@ -1,0 +1,56 @@
+import type { RegistrationEntry } from "./animal-registrations";
+
+export type SiteSettings = {
+  animal_registrations:RegistrationEntry[]|null;
+  animal_registration_published:boolean;
+  animal_registrant:string;
+  animal_business_name:string;
+  animal_business_address:string;
+  animal_business_type:string;
+  animal_registration_number:string;
+  animal_registration_date:string;
+  animal_registration_expiry:string;
+  animal_responsible_person:string;
+  store_name:string; tagline:string; business_hours:string; closed_days:string; address:string; phone:string;instagram_url:string;
+  parking_capacity:number; primary_color:string; background_color:string; font_family:string; base_font_size:number;
+  heading_font_family:string; heading_font_size:number; eyebrow_font_size:number;
+  hero_image_path:string; hero_mobile_image_path:string; about_image_path:string; exterior_image_path:string; map_url:string;
+  seo_title:string;seo_description:string;seo_keywords:string;seo_canonical_url:string;seo_image_path:string;seo_indexing_enabled:boolean;
+};
+
+export type SiteCopy = Record<string,{heading:string;body:string}>;
+
+export const defaultSettings:SiteSettings={
+  animal_registrations:null,
+  animal_registration_published:false,
+  animal_registrant:"",
+  animal_business_name:"",
+  animal_business_address:"",
+  animal_business_type:"",
+  animal_registration_number:"",
+  animal_registration_date:"",
+  animal_registration_expiry:"",
+  animal_responsible_person:"",
+  store_name:"豚ですもん。",tagline:"こぶたと過ごす、やさしい時間。",business_hours:"11:00〜18:00",closed_days:"毎週月曜日",
+  address:"愛知県安城市",phone:"",instagram_url:"",parking_capacity:1,primary_color:"#87533f",background_color:"#fbf7f1",font_family:"gothic",base_font_size:16,
+  heading_font_family:"serif",heading_font_size:48,eyebrow_font_size:11,hero_image_path:"",hero_mobile_image_path:"",about_image_path:"",exterior_image_path:"",map_url:"",
+  seo_title:"豚ですもん。｜マイクロブタカフェ",seo_description:"マイクロブタさんと、のんびりやさしい時間を。愛知県安城市のふれあいカフェ「豚ですもん。」",seo_keywords:"マイクロブタカフェ,マイクロブタ,愛知県,安城市,豚ですもん",seo_canonical_url:"",seo_image_path:"",seo_indexing_enabled:true
+};
+
+export const defaultCopy:SiteCopy={
+  hero:{heading:"ちいさな幸せに、\n会いにきてね。",body:"個性豊かなこぶたちゃんたちと、のんびり過ごす特別な時間。"},
+  about:{heading:"こぶたちゃんと過ごす、\nやさしいひととき。",body:"「豚ですもん。」は、かわいいマイクロブタたちと触れ合える小さなカフェです。木の温もりを感じる落ち着いた空間で、それぞれの個性をゆっくりお楽しみください。\n\n初めての方も、おひとりさまも、お子さま連れも大歓迎。"},
+  friends:{heading:"豚ですもん。の仲間たち",body:"みんな性格も模様もそれぞれ。お気に入りの子を見つけてね。"},
+  guide_reservation:{heading:"ご予約",body:"完全予約制ではありませんが、ご予約がおすすめです。"},
+  guide_parking:{heading:"駐車場",body:"店舗前に予約のお客様専用の駐車場が1台ございます。"},
+  guide_access:{heading:"アクセス",body:"愛知県安城市。詳しい場所はご予約時にご案内します。"},
+  reservation:{heading:"オンライン予約",body:"空き状況を確認して、そのままご予約いただけます。"},
+  footer:{heading:"豚ですもん。",body:"こぶたちゃん達と一緒に、皆さまのご来店をお待ちしております。"}
+};
+
+export function publicImageUrl(path:string){
+  if(!path)return "";
+  if(path.startsWith("http"))return path;
+  const base=process.env.NEXT_PUBLIC_SUPABASE_URL;
+  return base?`${base}/storage/v1/object/public/site-media/${path}`:"";
+}

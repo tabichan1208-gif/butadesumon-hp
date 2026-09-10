@@ -1,0 +1,206 @@
+"use client";
+
+import { DragEvent, FormEvent, useEffect, useMemo, useState, useTransition } from "react";
+import { InteriorEditor } from "./interior-editor";
+import type { InteriorPhoto } from "@/lib/interior";
+import { RegistrationRowsEditor } from "./registration-rows-editor";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { cancelReservation, deletePig, deleteLibraryImage, deletePricingItem, chooseSiteImage, saveEmailSettings, saveFaq, savePig, savePricingItem, savePricingSettings, saveReservation, saveSeoSettings, saveSiteCopy, saveSiteSettings } from "@/app/admin/actions";
+import type { SiteCopy, SiteSettings } from "@/lib/site-content";
+import type { EmailSettings } from "@/lib/email-settings";
+import type { PricingItem, PricingSettings } from "@/lib/pricing";
+import { mediaUsage } from "@/lib/media-usage";
+import { publicImageUrl } from "@/lib/site-content";
+
+const menu = ["予約管理","メール設定","サイト編集","店舗情報","ご利用料金","こぶた紹介","よくある質問","画像ライブラリ","SEO設定"];
+const sourceLabels: Record<string,string> = { WEB:"WEB", PHONE:"電話", WALK_IN:"店頭", OTHER:"その他" };
+const fontOptions = [
+  ["gothic","すっきりゴシック（読みやすい）"],
+  ["modern","モダンゴシック（洗練）"],
+  ["rounded","丸ゴシック（やさしい）"],
+  ["soft-rounded","やわらか丸文字（親しみ）"],
+  ["serif","明朝体（上品）"],
+  ["classic-serif","クラシック明朝（落ち着き）"],
+  ["handwritten","手書き風（温もり）"]
+] as const;
+
+export type AdminReservation = {
+  id:string; date:string; time:string; minutes:number; name:string; phone:string; email:string; note:string;
+  adults:number; children:number; infants:number; guests:number; parking:boolean; source:string; status:string;
+};
+export type AdminPig={id:string;name:string;breed:string;bio:string|null;image_path:string|null;sort_order:number;published:boolean};
+export type AdminFaq={id:string;question:string;answer:string;sort_order:number;published:boolean};
+export type AdminMedia={id:string;storage_path:string;alt_text:string|null;created_at:string};
+
+function localDateString(date = new Date()) {
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0,10);
+}
+
+export function AdminDashboard({reservations,settings,emailSettings,pricingSettings,pricingItems,copy,pigs,faqs,media,interior,interiorError}:{interior:InteriorPhoto[];interiorError:boolean;reservations:AdminReservation[];settings:SiteSettings;emailSettings:EmailSettings;pricingSettings:PricingSettings;pricingItems:PricingItem[];copy:SiteCopy;pigs:AdminPig[];faqs:AdminFaq[];media:AdminMedia[]}) {
+  const [active,setActive]=useState("予約管理");
+  const logout=async()=>{await createClient().auth.signOut();location.href="/admin/login"};
+  const content=active==="予約管理"?<ReservationPanel reservations={reservations} businessHours={settings.business_hours}/>:active==="メール設定"?<EmailSettingsEditor settings={emailSettings}/>:active==="サイト編集"?<div className="cms-stack"><SiteCopyEditor copy={copy} settings={settings} media={media}/><InteriorEditor photos={interior} media={media} loadError={interiorError}/></div>:active==="店舗情報"?<StoreSettingsEditor settings={settings}/>:active==="ご利用料金"?<PricingEditor settings={pricingSettings} items={pricingItems}/>:active==="こぶた紹介"?<PigEditor pigs={pigs} media={media}/>:active==="よくある質問"?<FaqEditor faqs={faqs}/>:active==="画像ライブラリ"?<MediaLibrary media={media} settings={settings} pigs={pigs} interior={interior} interiorError={interiorError}/>:<SeoSettingsEditor settings={settings} media={media}/>;
+  return <div className="admin-shell"><aside><div className="admin-brand"><span>MICRO PIG CAFE</span>豚ですもん。<small>管理画面</small></div><nav>{menu.map((m,i)=><button className={active===m?"active":""} onClick={()=>setActive(m)} key={m}><span>{["▦","✉","✎","⌂","¥","♡","?","▧","⌕"][i]}</span>{m}</button>)}</nav><Link href="/">← 公開サイトを見る</Link><button className="logout" onClick={logout}>ログアウト</button></aside><section className="admin-main"><header><div><p>店舗運営</p><h1>{active}</h1></div><div className="admin-user"><span>豚</span><div><b>店舗管理者</b><small>ログイン中</small></div></div></header>{content}</section></div>;
+}
+
+function EmailSettingsEditor({settings}:{settings:EmailSettings}){
+  const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");
+  const submit=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const data=new FormData(e.currentTarget);startTransition(async()=>{const result=await saveEmailSettings(data);setNotice(result.message);if(result.ok)router.refresh()})};
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<form className="admin-panel cms-form email-settings-form" onSubmit={submit}>
+    <div className="panel-head"><div><h2>予約メール</h2><p>Gmailの接続後に、ここで設定した内容を自動送信します。</p></div><button className="button" disabled={pending}>{pending?"保存中…":"設定を保存"}</button></div>
+    <div className="email-setup-note"><strong>現在は送信準備中です</strong><p>Gmailアドレスとアプリパスワードは後日Vercelに登録します。ここにパスワードを入力する必要はありません。</p></div>
+    <fieldset><legend>予約者様への受付完了メール</legend><label className="publish-check"><input name="customer_email_enabled" type="checkbox" defaultChecked={settings.customer_email_enabled}/> Gmail接続後、自動送信する</label><label>件名<input name="customer_subject" maxLength={200} defaultValue={settings.customer_subject} required/></label><label>本文<textarea name="customer_body" rows={13} maxLength={10000} defaultValue={settings.customer_body} required/></label></fieldset>
+    <fieldset><legend>店舗への新規予約通知</legend><label className="publish-check"><input name="store_email_enabled" type="checkbox" defaultChecked={settings.store_email_enabled}/> Gmail接続後、店舗にも通知する</label><label>通知先メールアドレス<input name="store_notification_email" type="email" maxLength={320} defaultValue={settings.store_notification_email} placeholder="例：shop@example.com"/></label><label>件名<input name="store_subject" maxLength={200} defaultValue={settings.store_subject} required/></label><label>本文<textarea name="store_body" rows={14} maxLength={10000} defaultValue={settings.store_body} required/></label></fieldset>
+    <aside className="email-tags"><strong>予約内容の差し込み項目</strong><p>件名・本文の好きな場所に、そのまま入力できます。</p><code>{"{{予約番号}}　{{お名前}}　{{来店日}}　{{開始時間}}　{{利用時間}}　{{人数}}　{{駐車場}}　{{電話番号}}　{{メール}}　{{備考}}"}</code></aside>
+    <button className="button cms-save" disabled={pending}>{pending?"保存中…":"設定を保存"}</button>
+  </form></div>;
+}
+
+function SeoSettingsEditor({settings,media}:{settings:SiteSettings;media:AdminMedia[]}){
+  const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");const[choosing,setChoosing]=useState(false);const[imagePath,setImagePath]=useState(settings.seo_image_path??"");
+  const submit=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const data=new FormData(e.currentTarget);startTransition(async()=>{const result=await saveSeoSettings(data);setNotice(result.message);if(result.ok)router.refresh()})};
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<form className="admin-panel cms-form seo-settings-form" onSubmit={submit}>
+    <div className="panel-head"><div><h2>検索・SNS表示設定</h2><p>Googleなどの検索結果や、URLを共有したときの表示内容を設定します。</p></div><button className="button" disabled={pending}>{pending?"保存中…":"設定を保存"}</button></div>
+    <div className="seo-index-control"><label className="publish-check"><input name="seo_indexing_enabled" type="checkbox" defaultChecked={settings.seo_indexing_enabled}/> 検索エンジンへの掲載を許可する</label><small>正式公開まではOFF、内容と独自ドメインの準備が整ったらONがおすすめです。</small></div>
+    <div className="settings-fields"><label className="wide">検索結果のタイトル<input name="seo_title" maxLength={100} defaultValue={settings.seo_title} required/><small>目安：30文字前後。店名・地域・お店の種類を含めます。</small></label><label className="wide">検索結果の説明文<textarea name="seo_description" rows={4} maxLength={300} defaultValue={settings.seo_description} required/><small>目安：80〜120文字。お店の特徴や地域を自然な文章で伝えます。</small></label><label className="wide">検索キーワード<input name="seo_keywords" defaultValue={settings.seo_keywords}/><small>カンマ区切りで入力します。検索順位を保証する項目ではありません。</small></label><label className="wide">正規URL（独自ドメイン取得後）<input name="seo_canonical_url" type="url" defaultValue={settings.seo_canonical_url} placeholder="https://example.jp/"/><small>未取得の間は空欄で問題ありません。</small></label></div>
+    <input type="hidden" name="seo_image_path" value={imagePath}/><section className="seo-share-image"><div><strong>SNS共有画像</strong><p>LINEなどでURLを共有したときに表示される画像です。未設定の場合はメイン写真を使用します。</p><small>推奨 1200 × 630px（横長）</small></div><div className="image-preview" style={imagePath?{backgroundImage:`url(${publicImageUrl(imagePath)})`}:undefined}>{!imagePath&&"メイン写真を使用"}</div><div><button className="button secondary" type="button" onClick={()=>setChoosing(true)}>画像ライブラリから選ぶ</button>{imagePath&&<button className="media-delete" type="button" onClick={()=>setImagePath("")}>専用画像を解除</button>}</div></section>
+    <div className="search-preview"><small>Google 検索結果の表示イメージ</small><h3>{settings.seo_title}</h3><p>{settings.seo_description}</p></div><button className="button cms-save" disabled={pending}>設定を保存</button>
+  </form>{choosing&&<div className="admin-modal" role="dialog" aria-modal="true" aria-label="SNS共有画像を選ぶ"><section className="image-picker"><div className="editor-title"><div><p>SEO設定</p><h2>画像を選択</h2></div><button type="button" onClick={()=>setChoosing(false)} aria-label="閉じる">×</button></div>{media.length===0?<p className="empty-state">画像ライブラリに写真がありません。</p>:<div className="picker-grid">{media.map(item=><button type="button" className="picker-button" key={item.id} onClick={()=>{setImagePath(item.storage_path);setChoosing(false)}}><span style={{backgroundImage:`url(${publicImageUrl(item.storage_path)})`}}/><small>{item.alt_text||"登録画像"}</small></button>)}</div>}</section></div>}</div>;
+}
+
+function ReservationPanel({reservations,businessHours}:{reservations:AdminReservation[];businessHours:string}) {
+  const router=useRouter();
+  const [selectedDate,setSelectedDate]=useState(localDateString());
+  const [editing,setEditing]=useState<AdminReservation|null|"new">(null);
+  const [notice,setNotice]=useState("");
+  const [pending,startTransition]=useTransition();
+  const dayReservations=useMemo(()=>reservations.filter(r=>r.date===selectedDate),[reservations,selectedDate]);
+  const activeReservations=useMemo(()=>dayReservations.filter(r=>r.status!=="CANCELLED"),[dayReservations]);
+  const totalGuests=activeReservations.reduce((sum,r)=>sum+r.guests,0);
+  const peak=useMemo(()=>Math.max(0,...timeline(activeReservations).map(slot=>slot.guests)),[activeReservations]);
+
+  function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();const data=new FormData(e.currentTarget);startTransition(async()=>{const result=await saveReservation(data);setNotice(result.message);if(result.ok){setEditing(null);router.refresh()}})}
+  function cancel(id:string){if(!confirm("この予約をキャンセルしますか？"))return;startTransition(async()=>{const result=await cancelReservation(id);setNotice(result.message);if(result.ok){setEditing(null);router.refresh()}})}
+
+  return <>
+    <div className="reservation-toolbar"><label>表示する日<input type="date" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)}/></label><button className="button" onClick={()=>setEditing("new")}>＋ 予約を追加</button></div>
+    {notice&&<p className="admin-notice">{notice}</p>}
+    <div className="admin-cards"><article><span>予約</span><b>{activeReservations.length}<small>件</small></b><em>選択日の有効な予約</em></article><article><span>ご来店予定</span><b>{totalGuests}<small>名</small></b><em>延べ人数</em></article><article><span>最大同時人数</span><b>{peak}<small>/ 8名</small></b><em>{peak<8?"空きあり":"満員時間あり"}</em></article><article><span>駐車場予約</span><b>{activeReservations.filter(r=>r.parking).length}<small>件</small></b><em>時間の重複を自動防止</em></article></div>
+    <div className="admin-reservation-layout"><div className="admin-panel"><div className="panel-head"><div><h2>{formatDate(selectedDate)}の予約</h2><p>キャンセル済みも履歴として残ります</p></div></div><div className="reservation-list">{dayReservations.length===0?<p className="empty-state">この日の予約はありません。</p>:dayReservations.map(r=><button className={`reservation-row${r.status==="CANCELLED"?" cancelled":""}`} key={r.id} onClick={()=>r.status!=="CANCELLED"&&setEditing(r)} disabled={r.status==="CANCELLED"}><time>{r.time}<small>{r.minutes}分</small></time><div className="res-main"><div><span className="source">{sourceLabels[r.source]??r.source}</span>{r.status==="CANCELLED"&&<span className="cancelled-label">キャンセル済み</span>}<h3>{r.name} 様</h3><small>{r.phone}</small>{r.note?.trim()?<div className="reservation-note"><strong>備考</strong><span>{r.note}</span></div>:null}</div><p>人数 <b>{r.guests}名</b></p><p>駐車場 <b>{r.parking?"あり":"なし"}</b></p><span>{r.status==="CANCELLED"?"":"›"}</span></div></button>)}</div></div><Timeline reservations={activeReservations}/></div>
+    <ParkingTimeline reservations={activeReservations} businessHours={businessHours} onSelect={setEditing}/>
+    {editing&&<ReservationEditor reservation={editing==="new"?null:editing} date={selectedDate} pending={pending} onClose={()=>setEditing(null)} onSubmit={submit} onCancel={cancel}/>} 
+  </>;
+}
+
+function ReservationEditor({reservation,date,pending,onClose,onSubmit,onCancel}:{reservation:AdminReservation|null;date:string;pending:boolean;onClose:()=>void;onSubmit:(e:FormEvent<HTMLFormElement>)=>void;onCancel:(id:string)=>void}) {
+  useEffect(()=>{document.querySelector<HTMLInputElement>('.reservation-editor input[name="reservation_date"]')?.setAttribute("min",localDateString())},[]);
+  return <div className="admin-modal" role="dialog" aria-modal="true" aria-label={reservation?"予約を編集":"予約を追加"}><form className="reservation-editor" onSubmit={onSubmit}><div className="editor-title"><div><p>{reservation?"予約内容の変更":"電話・店頭予約の登録"}</p><h2>{reservation?"予約を編集":"予約を追加"}</h2></div><button type="button" onClick={onClose} aria-label="閉じる">×</button></div><input type="hidden" name="id" value={reservation?.id??""}/><div className="editor-form-grid"><label>来店日<input name="reservation_date" type="date" defaultValue={reservation?.date??date} required/></label><label>開始時間<input name="start_time" type="time" step="900" defaultValue={reservation?.time??"10:00"} required/></label><label>利用時間<select name="duration_minutes" defaultValue={reservation?.minutes??30}>{[15,30,45,60].map(v=><option key={v} value={v}>{v}分</option>)}</select></label><label>受付経路<select name="source" defaultValue={reservation?.source??"PHONE"}><option value="WEB">WEB</option><option value="PHONE">電話</option><option value="WALK_IN">店頭</option><option value="OTHER">その他</option></select></label><label>13歳以上<input name="adults" type="number" min="0" max="8" defaultValue={reservation?.adults??1} required/></label><label>3〜12歳<input name="children" type="number" min="0" max="8" defaultValue={reservation?.children??0} required/></label><label>2歳以下<input name="infants" type="number" min="0" max="8" defaultValue={reservation?.infants??0} required/></label><label className="parking-check"><input name="parking" type="checkbox" defaultChecked={reservation?.parking??false}/> 駐車場を利用</label><label className="wide">お名前<input name="customer_name" defaultValue={reservation?.name??""} placeholder="例：安城 太郎" required/></label><label>電話番号<input name="phone" type="tel" defaultValue={reservation?.phone??""} required/></label><label>メール（任意）<input name="email" type="email" defaultValue={reservation?.email??""}/></label><label className="wide">備考<textarea name="note" rows={3} defaultValue={reservation?.note??""}/></label></div><div className="editor-actions">{reservation&&<button className="danger-button" type="button" disabled={pending} onClick={()=>onCancel(reservation.id)}>予約をキャンセル</button>}<button className="button secondary" type="button" onClick={onClose}>閉じる</button><button className="button" disabled={pending}>{pending?"保存中…":"保存する"}</button></div></form></div>;
+}
+
+function Timeline({reservations}:{reservations:AdminReservation[]}) { const slots=timeline(reservations);return <div className="admin-panel timeline-panel"><div className="panel-head"><div><h2>店内タイムライン</h2><p>15分ごとの同時人数と駐車場</p></div></div>{slots.length===0?<p className="empty-state">予約が入ると表示されます。</p>:<div className="timeline-list">{slots.map(s=><div key={s.time}><time>{s.time}</time><span className="occupancy"><i style={{width:`${Math.min(100,s.guests/8*100)}%`}}/></span><b>{s.guests}/8名</b><small>{s.parking?"🚗 使用中":"駐車場 空き"}</small></div>)}</div>}</div> }
+
+function timeline(reservations:AdminReservation[]){if(!reservations.length)return[];const toMinutes=(t:string)=>{const[h,m]=t.split(":").map(Number);return h*60+m};const start=Math.min(...reservations.map(r=>toMinutes(r.time)));const end=Math.max(...reservations.map(r=>toMinutes(r.time)+r.minutes));const slots=[];for(let minute=Math.floor(start/15)*15;minute<end;minute+=15){const current=reservations.filter(r=>{const s=toMinutes(r.time);return s<=minute&&s+r.minutes>minute});slots.push({time:`${String(Math.floor(minute/60)).padStart(2,"0")}:${String(minute%60).padStart(2,"0")}`,guests:current.reduce((n,r)=>n+r.guests,0),parking:current.some(r=>r.parking)})}return slots}
+function ParkingTimeline({reservations,businessHours,onSelect}:{reservations:AdminReservation[];businessHours:string;onSelect:(reservation:AdminReservation)=>void}){
+  const active=reservations.filter(r=>r.status!=="CANCELLED");
+  const parking=active.filter(r=>r.parking);
+  const minutes=(time:string)=>{const[h,m]=time.split(":").map(Number);return h*60+m};
+  const clock=(value:number)=>`${String(Math.floor(value/60)).padStart(2,"0")}:${String(value%60).padStart(2,"0")}`;
+  const hourMatches=businessHours.match(/\d{1,2}:\d{2}/g)??[];
+  const reservationStart=parking.length?Math.min(...parking.map(r=>minutes(r.time))):Infinity;
+  const reservationEnd=parking.length?Math.max(...parking.map(r=>minutes(r.time)+r.minutes)):-Infinity;
+  const opening=hourMatches[0]?minutes(hourMatches[0]):10*60;
+  const closing=hourMatches[1]?minutes(hourMatches[1]):17*60;
+  const rangeStart=Math.floor(Math.min(opening,reservationStart)/15)*15;
+  const rangeEnd=Math.ceil(Math.max(closing,reservationEnd)/15)*15;
+  const slots=[];for(let value=rangeStart;value<rangeEnd;value+=15)slots.push({time:clock(value),start:value});
+  const available=slots.filter(slot=>!parking.some(r=>minutes(r.time)<slot.start+15&&minutes(r.time)+r.minutes>slot.start)).length;
+  return <section className="admin-panel parking-timeline"><div className="panel-head parking-head"><div><h2>駐車場タイムライン</h2><p>営業時間内の空き状況です。予約者名を押すと詳細が開きます。</p></div><div className="parking-summary" aria-label={`全${slots.length}枠中${available}枠が空き`}><strong>{available}<small> / {slots.length}枠</small></strong><span>空き</span></div></div><div className="parking-legend" aria-label="駐車場タイムラインの凡例"><span><i className="free"/>空き</span><span><i className="busy"/>予約あり</span></div><div className="parking-slots">{slots.map(slot=>{
+    const start=slot.start;
+    const current=parking.filter(r=>minutes(r.time)<start+15&&minutes(r.time)+r.minutes>start);
+    return <div className={current.length?"parking-slot reserved":"parking-slot"} key={slot.time}><div className="parking-slot-status"><time>{slot.time}</time><strong>{current.length?"予約あり":"空き"}</strong></div><small className="parking-slot-range">〜{clock(start+15)}</small>{current.map(r=><button type="button" key={r.id} onClick={()=>onSelect(r)} aria-label={`${r.name}様の駐車場予約を開く`}><b>{r.name} 様 ›</b><small>{r.time}〜{clock(minutes(r.time)+r.minutes)}</small></button>)}</div>;
+  })}</div></section>;
+}
+function formatDate(value:string){const[y,m,d]=value.split("-");return `${y}年${Number(m)}月${Number(d)}日`}
+function SiteCopyEditor({copy,settings,media}:{copy:SiteCopy;settings:SiteSettings;media:AdminMedia[]}){
+  const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");const[pickerSlot,setPickerSlot]=useState<"hero"|"hero_mobile"|"about"|"exterior"|null>(null);
+  const submit=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const data=new FormData(e.currentTarget);startTransition(async()=>{const result=await saveSiteCopy(data);setNotice(result.message);if(result.ok)router.refresh()})};
+  const selectImage=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const data=new FormData(e.currentTarget);startTransition(async()=>{const result=await chooseSiteImage(data);setNotice(result.message);if(result.ok){setPickerSlot(null);router.refresh()}})};
+  const sections=[
+    ["hero","メインビジュアル"],["about","店舗紹介"],["friends","こぶた紹介"],["guide_reservation","利用案内・予約"],
+    ["guide_parking","利用案内・駐車場"],["guide_access","利用案内・アクセス"],["reservation","予約セクション"],["footer","フッター"]
+  ];
+  const pickerLabel=pickerSlot==="hero"?"メイン写真（PC）":pickerSlot==="hero_mobile"?"メイン写真（スマホ）":pickerSlot==="about"?"店舗紹介写真":"お店の外観写真";
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<section className="admin-panel"><div className="panel-head"><div><h2>写真を変更</h2><p>登録済みの画像ライブラリから選択します</p></div></div><div className="image-edit-grid">{([['hero','メイン写真（PC）',settings.hero_image_path],['hero_mobile','メイン写真（スマホ）',settings.hero_mobile_image_path],['about','店舗紹介写真',settings.about_image_path],['exterior','お店の外観写真',settings.exterior_image_path]] as const).map(([slot,label,path])=><article key={slot}><div className="image-preview" style={path?{backgroundImage:`url(${publicImageUrl(path)})`}:undefined}>{!path&&"写真未設定"}</div><b>{label}</b><button type="button" className="button" onClick={()=>setPickerSlot(slot)}>画像ライブラリから選ぶ</button></article>)}</div></section><form className="admin-panel cms-form" onSubmit={submit}><div className="panel-head"><div><h2>各セクションの文章</h2><p>改行も公開サイトへ反映されます</p></div><button className="button" disabled={pending}>{pending?"保存中…":"文章を保存"}</button></div><div className="copy-edit-grid">{sections.map(([key,label])=><fieldset key={key}><legend>{label}</legend><label>見出し<textarea name={`${key}_heading`} rows={2} defaultValue={copy[key]?.heading??""} placeholder="Enterキーで改行できます"/></label><label>文章<textarea name={`${key}_body`} rows={4} defaultValue={copy[key]?.body??""}/></label></fieldset>)}</div><button className="button cms-save" disabled={pending}>文章を保存</button></form>{pickerSlot&&<div className="admin-modal" role="dialog" aria-modal="true" aria-label="画像ライブラリから写真を選ぶ"><section className="image-picker"><div className="editor-title"><div><p>{pickerLabel}</p><h2>画像を選択</h2></div><button type="button" onClick={()=>setPickerSlot(null)} aria-label="閉じる">×</button></div>{media.length===0?<div className="empty-state"><p>画像ライブラリに写真がありません。</p><p>左メニューの「画像ライブラリ」から写真を追加してください。</p></div>:<div className="picker-grid">{media.map(item=><form key={item.id} onSubmit={selectImage}><button type="submit" disabled={pending} aria-label={`${item.alt_text||"登録画像"}を選択`}><span style={{backgroundImage:`url(${publicImageUrl(item.storage_path)})`}}/><small>{item.alt_text||"登録画像"}</small></button><input type="hidden" name="path" value={item.storage_path}/><input type="hidden" name="slot" value={pickerSlot}/></form>)}</div>}</section></div>}</div>;
+}
+
+function StoreSettingsEditor({settings}:{settings:SiteSettings}){
+  const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");
+  const submit=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const data=new FormData(e.currentTarget);startTransition(async()=>{const result=await saveSiteSettings(data);setNotice(result.message);if(result.ok)router.refresh()})};
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<form className="admin-panel cms-form" onSubmit={submit}>
+    <div className="panel-head"><div><h2>店舗情報</h2><p>公開サイトの店舗情報へ反映されます</p></div><button className="button" disabled={pending}>{pending?"保存中…":"変更を保存"}</button></div>
+    <div className="settings-fields"><label>店名<input name="store_name" defaultValue={settings.store_name} required/></label><label>キャッチコピー<input name="tagline" defaultValue={settings.tagline}/></label><label>営業時間<input name="business_hours" defaultValue={settings.business_hours}/></label><label>定休日<input name="closed_days" defaultValue={settings.closed_days}/></label><label>住所<input name="address" defaultValue={settings.address}/></label><label>電話番号<input name="phone" defaultValue={settings.phone}/></label><label className="wide">GoogleマップURL<input name="map_url" type="url" defaultValue={settings.map_url}/></label><label className="wide">Instagram URL<input name="instagram_url" type="url" defaultValue={settings.instagram_url} placeholder="https://www.instagram.com/アカウント名/"/><small>Instagramのプロフィール画面からURLをコピーして貼り付けてください。</small></label></div>
+    <hr/><div className="panel-head"><div><h2>第一種動物取扱業の登録情報</h2><p>登録証が届くまでは空欄・非公開で保存できます。公開前に共通情報と種別ごとの登録番号を登録証と照合してください。</p></div></div>
+    <div className="settings-fields"><label className="wide registration-publish"><span><input type="checkbox" name="animal_registration_published" defaultChecked={settings.animal_registration_published??false}/> 登録情報を公開する</span></label><label>登録者の氏名または名称<input name="animal_registrant" defaultValue={settings.animal_registrant??""}/></label><label>事業所の名称<input name="animal_business_name" defaultValue={settings.animal_business_name??""}/></label><label>事業所の所在地<input name="animal_business_address" defaultValue={settings.animal_business_address??""}/></label><RegistrationRowsEditor settings={settings}/><label>登録年月日<input name="animal_registration_date" defaultValue={settings.animal_registration_date??""}/></label><label>有効期間の末日<input name="animal_registration_expiry" defaultValue={settings.animal_registration_expiry??""}/></label><label>動物取扱責任者氏名<input name="animal_responsible_person" defaultValue={settings.animal_responsible_person??""}/></label></div>
+    <hr/><div className="panel-head"><div><h2>フォントと色</h2><p>雰囲気の説明を参考に、本文と見出しを別々に選べます</p></div></div>
+    <div className="settings-fields"><label>本文フォント<select name="font_family" defaultValue={settings.font_family}>{fontOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label>本文サイズ<input name="base_font_size" type="number" min="12" max="24" defaultValue={settings.base_font_size}/></label><label>見出しフォント<select name="heading_font_family" defaultValue={settings.heading_font_family}>{fontOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label>見出しサイズ<input name="heading_font_size" type="number" min="24" max="80" defaultValue={settings.heading_font_size}/></label><label>英字見出しサイズ<input name="eyebrow_font_size" type="number" min="8" max="20" defaultValue={settings.eyebrow_font_size}/></label><label>メインカラー<input name="primary_color" type="color" defaultValue={settings.primary_color}/></label><label>背景色<input name="background_color" type="color" defaultValue={settings.background_color}/></label></div>
+    <button className="button cms-save" disabled={pending}>変更を保存</button>
+  </form></div>;
+}
+
+function PricingEditor({settings,items}:{settings:PricingSettings;items:PricingItem[]}){
+  const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");
+  const run=(action:(data:FormData)=>Promise<{ok:boolean;message:string}>)=>(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);startTransition(async()=>{const result=await action(data);setNotice(result.message);if(result.ok){if(action===savePricingItem&&!data.get("id"))form.reset();router.refresh()}})};
+  const remove=(item:PricingItem)=>{if(!window.confirm(`「${item.label}」を削除しますか？`))return;startTransition(async()=>{const result=await deletePricingItem(item.id);setNotice(result.message);if(result.ok)router.refresh()})};
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<form className="admin-panel cms-form" onSubmit={run(savePricingSettings)}><div className="panel-head"><div><h2>料金コーナー</h2><p>公開サイトの「ご利用案内」と「オンライン予約」の間に表示されます。</p></div><button className="button" disabled={pending}>設定を保存</button></div><div className="settings-fields"><label className="wide registration-publish"><span><input name="published" type="checkbox" defaultChecked={settings.published}/> 料金コーナーを公開する</span></label><label className="wide">見出し<textarea name="heading" rows={2} maxLength={100} defaultValue={settings.heading} required/></label><label className="wide">案内文<textarea name="description" rows={3} maxLength={1000} defaultValue={settings.description}/></label><label className="wide">コーナー下部の注意書き<textarea name="note" rows={3} maxLength={1000} defaultValue={settings.note}/></label></div><button className="button cms-save" disabled={pending}>設定を保存</button></form><section className="admin-panel"><div className="panel-head"><div><h2>料金項目</h2><p>「大人」「子ども」など、必要な数だけ追加できます。</p></div></div><div className="manager-list"><PricingItemForm pending={pending} onSubmit={run(savePricingItem)}/>{items.map(item=><PricingItemForm key={item.id} item={item} pending={pending} onSubmit={run(savePricingItem)} onDelete={()=>remove(item)}/>)}</div></section></div>;
+}
+
+function PricingItemForm({item,pending,onSubmit,onDelete}:{item?:PricingItem;pending:boolean;onSubmit:(e:FormEvent<HTMLFormElement>)=>void;onDelete?:()=>void}){
+  return <form className="manager-card pricing-manager" onSubmit={onSubmit}><div className="manager-fields"><input name="id" type="hidden" value={item?.id??""}/><label>料金区分<input name="label" maxLength={100} defaultValue={item?.label??""} placeholder="例：13歳以上" required/></label><label>表示する金額<input name="price" maxLength={100} defaultValue={item?.price??""} placeholder="例：30分 1,000円" required/></label><label className="wide">補足<textarea name="description" rows={2} maxLength={500} defaultValue={item?.description??""} placeholder="例：延長15分ごとに500円"/></label><label>表示順<input name="sort_order" type="number" defaultValue={item?.sort_order??0}/></label><label className="publish-check"><input name="published" type="checkbox" defaultChecked={item?.published??true}/> 公開する</label></div><div className="pig-form-actions"><button className="button" disabled={pending}>{item?"変更を保存":"＋ 料金項目を追加"}</button>{item&&onDelete&&<button className="media-delete" type="button" disabled={pending} onClick={onDelete}>削除する</button>}</div></form>;
+}
+
+function PigEditor({pigs,media}:{pigs:AdminPig[];media:AdminMedia[]}){
+  const remove=(pig:AdminPig)=>{
+    if(!window.confirm(`「${pig.name}」をこぶた紹介から削除しますか？紹介情報は元に戻せません。画像ライブラリの元写真は残ります。一時的に隠す場合は「公開する」のチェックを外してください。`))return;
+    startTransition(async()=>{
+      try{const result=await deletePig(pig.id);setNotice(result.message);router.refresh();}
+      catch{setNotice("削除できませんでした。画面を更新して確認してください。");}
+    });
+  };
+  const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");
+  const submit=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);startTransition(async()=>{const result=await savePig(data);setNotice(result.message);if(result.ok){if(!data.get("id"))form.reset();router.refresh()}})};
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<section className="admin-panel"><div className="panel-head"><div><h2>こぶた紹介</h2><p>写真は画像ライブラリから選択できます。表示順が小さい順に公開サイトへ並びます</p></div></div><div className="manager-list"><PigForm media={media} onSubmit={submit} pending={pending}/>{pigs.map(pig=><PigForm key={pig.id} pig={pig} media={media} onSubmit={submit} pending={pending} onDelete={()=>remove(pig)}/>)}</div></section></div>;
+}
+function PigForm({pig,media,onSubmit,pending,onDelete}:{onDelete?:()=>void;pig?:AdminPig;media:AdminMedia[];onSubmit:(e:FormEvent<HTMLFormElement>)=>void;pending:boolean}){
+  const[imagePath,setImagePath]=useState(pig?.image_path??"");const[choosing,setChoosing]=useState(false);
+  return <><form className="manager-card" onSubmit={onSubmit}><div className="manager-thumb" style={imagePath?{backgroundImage:`url(${publicImageUrl(imagePath)})`}:undefined}>{!imagePath&&"写真未設定"}</div><div className="manager-fields"><input type="hidden" name="id" value={pig?.id??""}/><input type="hidden" name="image_path" value={imagePath}/><label>名前<input name="name" defaultValue={pig?.name??""} required placeholder="例：チョコ"/></label><label>種類・紹介見出し<input name="breed" defaultValue={pig?.breed??"マイクロブタ"}/></label><label>紹介文<textarea name="bio" rows={2} defaultValue={pig?.bio??""}/></label><label>写真<button type="button" className="library-select" onClick={()=>setChoosing(true)}>画像ライブラリから選ぶ</button></label><label>表示順<input name="sort_order" type="number" defaultValue={pig?.sort_order??0}/></label><label className="publish-check"><input name="published" type="checkbox" defaultChecked={pig?.published??true}/> 公開する</label></div><div className="pig-form-actions"><button className="button" disabled={pending}>{pig?"変更を保存":"＋ 追加する"}</button>{pig&&onDelete&&<button type="button" className="media-delete" disabled={pending} onClick={onDelete}>このこぶたを削除</button>}</div></form>{choosing&&<div className="admin-modal" role="dialog" aria-modal="true" aria-label="こぶたの写真を選ぶ"><section className="image-picker"><div className="editor-title"><div><p>こぶた紹介</p><h2>画像を選択</h2></div><button type="button" onClick={()=>setChoosing(false)} aria-label="閉じる">×</button></div>{media.length===0?<div className="empty-state"><p>画像ライブラリに写真がありません。</p><p>先に「画像ライブラリ」から写真を追加してください。</p></div>:<div className="picker-grid">{media.map(item=><button type="button" className="picker-button" key={item.id} onClick={()=>{setImagePath(item.storage_path);setChoosing(false)}}><span style={{backgroundImage:`url(${publicImageUrl(item.storage_path)})`}}/><small>{item.alt_text||"登録画像"}</small></button>)}</div>}</section></div>}</>;
+}
+
+function FaqEditor({faqs}:{faqs:AdminFaq[]}){
+  const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");
+  const submit=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);startTransition(async()=>{const result=await saveFaq(data);setNotice(result.message);if(result.ok){if(!data.get("id"))form.reset();router.refresh()}})};
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<section className="admin-panel"><div className="panel-head"><div><h2>よくある質問</h2><p>質問の追加・編集・公開切り替えができます</p></div></div><div className="manager-list"><FaqForm onSubmit={submit} pending={pending}/>{faqs.map(faq=><FaqForm key={faq.id} faq={faq} onSubmit={submit} pending={pending}/>)}</div></section></div>;
+}
+function FaqForm({faq,onSubmit,pending}:{faq?:AdminFaq;onSubmit:(e:FormEvent<HTMLFormElement>)=>void;pending:boolean}){
+  return <form className="manager-card faq-manager" onSubmit={onSubmit}><div className="manager-fields"><input type="hidden" name="id" value={faq?.id??""}/><label>質問<input name="question" defaultValue={faq?.question??""} required placeholder="例：予約なしでも入れますか？"/></label><label>回答<textarea name="answer" rows={3} defaultValue={faq?.answer??""} required/></label><label>表示順<input name="sort_order" type="number" defaultValue={faq?.sort_order??0}/></label><label className="publish-check"><input name="published" type="checkbox" defaultChecked={faq?.published??true}/> 公開する</label></div><button className="button" disabled={pending}>{faq?"変更を保存":"＋ 追加する"}</button></form>;
+}
+
+function MediaLibrary({media,settings,pigs,interior,interiorError}:{interior:InteriorPhoto[];interiorError:boolean;media:AdminMedia[];settings:SiteSettings;pigs:AdminPig[]}){
+  const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");
+  const[dragging,setDragging]=useState(false);const[selectedFiles,setSelectedFiles]=useState<File[]>([]);
+  const run=(action:(data:FormData)=>Promise<{ok:boolean;message:string}>)=>(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);startTransition(async()=>{const result=await action(data);setNotice(result.message);if(result.ok){form.reset();router.refresh()}})};
+  const keepImages=(files:File[])=>setSelectedFiles(files.filter(file=>file.type.startsWith("image/")).slice(0,20));
+  const drop=(e:DragEvent<HTMLLabelElement>)=>{e.preventDefault();setDragging(false);keepImages(Array.from(e.dataTransfer.files))};
+  const upload=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();if(selectedFiles.length===0){setNotice("写真を選択してください。");return}if(selectedFiles.some(file=>file.size>8*1024*1024)){setNotice("1枚あたり8MB以下の画像を選択してください。");return}const form=e.currentTarget;startTransition(async()=>{try{const supabase=createClient();const stamp=Date.now();const results=await Promise.all(selectedFiles.map(async(file,index)=>{const extension=(file.name.split(".").pop()||"jpg").replace(/[^a-zA-Z0-9]/g,"");const path=`library/${stamp}-${index}-${Math.random().toString(36).slice(2,8)}.${extension}`;const{error}=await supabase.storage.from("site-media").upload(path,file,{contentType:file.type,upsert:false});return error?null:{storage_path:path,alt_text:file.name,mime_type:file.type,size_bytes:file.size}}));const rows=results.filter((result):result is NonNullable<typeof result>=>result!==null);if(rows.length!==selectedFiles.length){setNotice("一部の写真をアップロードできませんでした。もう一度お試しください。");return}const{error}=await supabase.from("media_assets").insert(rows);if(error){setNotice("画像ライブラリへ登録できませんでした。");return}setNotice(`${selectedFiles.length}枚の画像をライブラリへ追加しました。`);form.reset();setSelectedFiles([]);router.refresh()}catch{setNotice("写真をアップロードできませんでした。もう一度お試しください。")}})};
+  const remove=(item:AdminMedia)=>{
+    if(!window.confirm(`「${item.alt_text||"登録画像"}」を画像ライブラリから削除しますか？\n元ファイルは復旧用に保管されます。`))return;
+    startTransition(async()=>{
+      try{const result=await deleteLibraryImage(item.id);setNotice(result.message);router.refresh()}
+      catch{setNotice("削除できませんでした。もう一度お試しください。")}
+    });
+  };
+  const fileCount=selectedFiles.length;
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<section className="admin-panel"><div className="panel-head"><div><h2>画像ライブラリ</h2><p>登録済み画像をメイン写真や店舗紹介写真に使えます</p></div></div><form className="library-upload" onSubmit={upload}><label className={`image-drop-zone${dragging?" dragging":""}`} htmlFor="library-image" onDragEnter={e=>{e.preventDefault();setDragging(true)}} onDragOver={e=>e.preventDefault()} onDragLeave={()=>setDragging(false)} onDrop={drop}><span>複数の写真をここへドラッグ＆ドロップ</span><small>{fileCount?`${fileCount}枚を選択中`:"またはクリックして写真を選択（最大20枚）"}</small><input id="library-image" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>keepImages(Array.from(e.target.files??[]))}/></label><button className="button" disabled={pending||fileCount===0}>{pending?"追加中…":fileCount?`${fileCount}枚を追加`:"画像を追加"}</button></form><div className="media-grid">{media.length===0?<p className="empty-state">画像はまだありません。</p>:media.map(item=>{const places=mediaUsage(item.storage_path,settings,pigs,interior);return <article key={item.id}><div className="media-photo" style={{backgroundImage:`url(${publicImageUrl(item.storage_path)})`}}/><p>{item.alt_text||"登録画像"}</p><div className="media-usage"><strong>{interiorError?"使用場所を確認できません":places.length?"使用中":"未使用"}</strong>{places.length>0&&<ul>{places.map(place=><li key={place}>{place}</li>)}</ul>}</div><form onSubmit={run(chooseSiteImage)}><input type="hidden" name="path" value={item.storage_path}/><select name="slot" defaultValue="hero"><option value="hero">メイン写真（PC）</option><option value="hero_mobile">メイン写真（スマホ）</option><option value="about">店舗紹介写真</option></select><button className="button secondary" disabled={pending}>この画像を使う</button></form><button type="button" className="media-delete" disabled={pending||places.length>0||interiorError} onClick={()=>remove(item)}>{places.length?"使用中のため削除不可":"削除する"}</button></article>})}</div></section></div>;
+}
