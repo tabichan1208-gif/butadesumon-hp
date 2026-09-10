@@ -12,10 +12,8 @@ export default async function AdminPage() {
   const{data:{user}}=await supabase.auth.getUser();
   const id=user?.id;
   if(!id) redirect("/admin/login");
-  const{data:isStaff}=await supabase.rpc("is_staff");
-  if(!isStaff) redirect("/admin/login?error=permission");
   const {data:profile}=await supabase.from("profiles").select("id,email,display_name,role,permissions").eq("id",id).single();
-  if(!profile) redirect("/admin/login?error=permission");
+  if(!profile || !["ADMIN","STAFF"].includes(profile.role)) redirect("/admin/login?error=permission");
   const profilesResult=profile.role==="ADMIN"?await supabase.from("profiles").select("id,email,display_name,role,permissions,created_at").order("created_at"): {data:[]};
   const[{data},{data:settingsData},{data:contentData},{data:pigData},{data:faqData},{data:mediaData},interiorResult,emailResult,pricingSettingsResult,pricingItemsResult]=await Promise.all([
     supabase.from("reservations").select("id,reservation_date,start_time,duration_minutes,customer_name,phone,email,note,adults,children,infants,parking,source,status").order("reservation_date").order("start_time"),
