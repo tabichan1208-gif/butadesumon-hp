@@ -12,6 +12,7 @@ export const permissionOptions = [
 
 export type PermissionKey = (typeof permissionOptions)[number][0];
 export type StaffPermissions = Partial<Record<PermissionKey, boolean>>;
+export type ManagementRole = "ADMIN" | "OWNER" | "STAFF";
 
 export const menuPermission: Record<string, PermissionKey> = {
   "予約管理": "reservations",
@@ -25,6 +26,10 @@ export const menuPermission: Record<string, PermissionKey> = {
   "SEO設定": "seo",
 };
 
-export function canAccess(role: "ADMIN" | "STAFF", permissions: StaffPermissions, key: PermissionKey) {
-  return role === "ADMIN" || permissions[key] === true;
+export function canAccess(role: ManagementRole, permissions: StaffPermissions, key: PermissionKey) {
+  return role === "ADMIN" || role === "OWNER" || permissions[key] === true;
+}
+
+export function managementRoleLabel(role: ManagementRole) {
+  return role === "ADMIN" ? "管理者" : role === "OWNER" ? "オーナー" : "スタッフ";
 }
