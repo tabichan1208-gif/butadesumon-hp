@@ -15,8 +15,9 @@ export default async function AdminPage() {
   if(!id) redirect("/admin/login");
   const admin=createAdminClient();
   if(!admin) redirect("/admin/login?error=setup");
-  const {data:profile}=await admin.from("profiles").select("id,email,display_name,role,permissions").eq("id",id).single();
-  if(!profile || !["ADMIN","STAFF"].includes(profile.role)) redirect("/admin/login?error=permission");
+  const {data:profile,error:profileError}=await admin.from("profiles").select("id,email,display_name,role,permissions").eq("id",id).single();
+  if(profileError) redirect(`/admin/login?error=${profileError.code==="PGRST116"?"profile":"database"}`);
+  if(!profile || !["ADMIN","STAFF"].includes(profile.role)) redirect("/admin/login?error=role");
   const profilesResult=profile.role==="ADMIN"?await admin.from("profiles").select("id,email,display_name,role,permissions,created_at").order("created_at"): {data:[]};
   const[{data},{data:settingsData},{data:contentData},{data:pigData},{data:faqData},{data:mediaData},interiorResult,emailResult,pricingSettingsResult,pricingItemsResult]=await Promise.all([
     supabase.from("reservations").select("id,reservation_date,start_time,duration_minutes,customer_name,phone,email,note,adults,children,infants,parking,source,status").order("reservation_date").order("start_time"),
