@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AdminDashboard } from "@/components/admin-dashboard";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { defaultCopy, defaultSettings } from "@/lib/site-content";
 import { defaultEmailSettings } from "@/lib/email-settings";
@@ -12,9 +13,11 @@ export default async function AdminPage() {
   const{data:{user}}=await supabase.auth.getUser();
   const id=user?.id;
   if(!id) redirect("/admin/login");
-  const {data:profile}=await supabase.from("profiles").select("id,email,display_name,role,permissions").eq("id",id).single();
+  const admin=createAdminClient();
+  if(!admin) redirect("/admin/login?error=setup");
+  const {data:profile}=await admin.from("profiles").select("id,email,display_name,role,permissions").eq("id",id).single();
   if(!profile || !["ADMIN","STAFF"].includes(profile.role)) redirect("/admin/login?error=permission");
-  const profilesResult=profile.role==="ADMIN"?await supabase.from("profiles").select("id,email,display_name,role,permissions,created_at").order("created_at"): {data:[]};
+  const profilesResult=profile.role==="ADMIN"?await admin.from("profiles").select("id,email,display_name,role,permissions,created_at").order("created_at"): {data:[]};
   const[{data},{data:settingsData},{data:contentData},{data:pigData},{data:faqData},{data:mediaData},interiorResult,emailResult,pricingSettingsResult,pricingItemsResult]=await Promise.all([
     supabase.from("reservations").select("id,reservation_date,start_time,duration_minutes,customer_name,phone,email,note,adults,children,infants,parking,source,status").order("reservation_date").order("start_time"),
     supabase.from("site_settings").select("*").eq("id",true).maybeSingle(),

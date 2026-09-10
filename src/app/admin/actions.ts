@@ -57,16 +57,21 @@ async function getStaffClient(permission: PermissionKey) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data: allowed } = await supabase.rpc("has_permission", { permission_name: permission });
-  return allowed ? supabase : null;
+  const admin = createAdminClient();
+  if (!admin) return null;
+  const { data: profile } = await admin.from("profiles").select("role,permissions").eq("id", user.id).single();
+  const permissions = (profile?.permissions ?? {}) as StaffPermissions;
+  return profile && (profile.role === "ADMIN" || permissions[permission] === true) ? supabase : null;
 }
 
-async function getOwnerClient() {
+async function getOwnerContext() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data: isAdmin } = await supabase.rpc("is_admin");
-  return isAdmin ? supabase : null;
+  const admin = createAdminClient();
+  if (!admin) return null;
+  const { data: profile } = await admin.from("profiles").select("role").eq("id", user.id).single();
+  return profile?.role === "ADMIN" ? { admin, userId: user.id } : null;
 }
 
 function text(formData: FormData, key: string) {
@@ -296,9 +301,9 @@ function permissionsFrom(formData: FormData): StaffPermissions {
 }
 
 export async function createManagementAccount(formData: FormData): Promise<ActionResult> {
-  if (!await getOwnerClient()) return { ok: false, message: "オーナー権限が必要です。" };
-  const admin = createAdminClient();
-  if (!admin) return { ok: false, message: "アカウント発行用のサーバー設定が未完了です。" };
+  const owner = await getOwnerContext();
+  if (!owner) return { ok: false, message: "オーナー権限が必要です。" };
+  const { admin } = owner;
   const email = text(formData, "email").toLowerCase();
   const password = text(formData, "password");
   const displayName = text(formData, "display_name");
@@ -332,18 +337,17 @@ export async function createManagementAccount(formData: FormData): Promise<Actio
 }
 
 export async function updateManagementAccount(formData: FormData): Promise<ActionResult> {
-  const ownerClient = await getOwnerClient();
-  if (!ownerClient) return { ok: false, message: "オーナー権限が必要です。" };
+  const owner = await getOwnerContext();
+  if (!owner) return { ok: false, message: "オーナー権限が必要です。" };
   const id = text(formData, "id");
   const displayName = text(formData, "display_name");
   const role = text(formData, "role") === "ADMIN" ? "ADMIN" : "STAFF";
   if (!/^[0-9a-f-]{36}$/i.test(id) || !displayName) return { ok: false, message: "アカウント情報を確認してください。" };
-  const { data: { user } } = await ownerClient.auth.getUser();
-  if (user?.id === id && role !== "ADMIN") return { ok: false, message: "自分自身のオーナー権限は解除できません。" };
+  if (owner.userId === id && role !== "ADMIN") return { ok: false, message: "自分自身のオーナー権限は解除できません。" };
   const permissions = role === "ADMIN"
     ? Object.fromEntries(permissionOptions.map(([key]) => [key, true]))
     : permissionsFrom(formData);
-  const { data, error } = await ownerClient.from("profiles").update({ display_name: displayName, role, permissions }).eq("id", id).select("id");
+  const { data, error } = await owner.admin.from("profiles").update({ display_name: displayName, role, permissions }).eq("id", id).select("id");
   if (error || !data?.length) return { ok: false, message: "権限設定を保存できませんでした。" };
   revalidatePath("/admin");
   return { ok: true, message: "アカウントの種類と権限を更新しました。" };
