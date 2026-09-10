@@ -5,9 +5,11 @@ import { createClient } from "@/lib/supabase/server";
 import { parseRegistrationEntries } from "@/lib/animal-registrations";
 import { mediaUsage } from "@/lib/media-usage";
 import type { EmailSettings } from "@/lib/email-settings";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { permissionOptions, type PermissionKey, type StaffPermissions } from "@/lib/permissions";
 
 export async function deleteLibraryImage(id: string): Promise<ActionResult> {
-  const supabase = await getStaffClient();
+  const supabase = await getStaffClient("media");
   if (!supabase) return { ok: false, message: "ログインが切れました。再度ログインしてください。" };
   const [asset, settings, pigs, interior] = await Promise.all([
     supabase.from("media_assets").select("storage_path").eq("id", id).single(),
@@ -28,7 +30,7 @@ export async function deleteLibraryImage(id: string): Promise<ActionResult> {
 type ActionResult = { ok: boolean; message: string };
 
 export async function saveInteriorPhoto(formData: FormData): Promise<ActionResult> {
-  const supabase = await getStaffClient();
+  const supabase = await getStaffClient("site");
   if (!supabase) return {ok:false,message:"再度ログインしてください。"};
   const id=text(formData,"id"), path=text(formData,"image_path"), caption=text(formData,"caption");
   const order=Number(formData.get("sort_order"));
@@ -43,7 +45,7 @@ export async function saveInteriorPhoto(formData: FormData): Promise<ActionResul
 }
 
 export async function removeInteriorPhoto(id:string):Promise<ActionResult>{
-  const supabase=await getStaffClient();
+  const supabase=await getStaffClient("site");
   if(!supabase)return {ok:false,message:"再度ログインしてください。"};
   const {data,error}=await supabase.from("interior_photos").delete().eq("id",id).select("id");
   if(error || !data?.length)return {ok:false,message:"掲載を解除できませんでした。画面を更新してください。"};
@@ -51,12 +53,20 @@ export async function removeInteriorPhoto(id:string):Promise<ActionResult>{
   return {ok:true,message:"店内写真の掲載を解除しました。画像ライブラリの写真は残っています。"};
 }
 
-async function getStaffClient() {
+async function getStaffClient(permission: PermissionKey) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data: isStaff } = await supabase.rpc("is_staff");
-  return isStaff ? supabase : null;
+  const { data: allowed } = await supabase.rpc("has_permission", { permission_name: permission });
+  return allowed ? supabase : null;
+}
+
+async function getOwnerClient() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: isAdmin } = await supabase.rpc("is_admin");
+  return isAdmin ? supabase : null;
 }
 
 function text(formData: FormData, key: string) {
@@ -74,7 +84,7 @@ function messageFor(error: string) {
 }
 
 export async function saveEmailSettings(formData:FormData):Promise<ActionResult>{
-  const supabase=await getStaffClient();
+  const supabase=await getStaffClient("email");
   if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
   const payload:Omit<EmailSettings,"store_notification_email">&{store_notification_email:string}={
     customer_email_enabled:formData.get("customer_email_enabled")==="on",
@@ -94,7 +104,7 @@ export async function saveEmailSettings(formData:FormData):Promise<ActionResult>
 }
 
 export async function saveSeoSettings(formData:FormData):Promise<ActionResult>{
-  const supabase=await getStaffClient();
+  const supabase=await getStaffClient("seo");
   if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
   const canonical=text(formData,"seo_canonical_url");
   if(canonical&&!/^https:\/\/[^\s]+$/.test(canonical))return{ok:false,message:"正規URLは https:// から始まる公開サイトのURLを入力してください。"};
@@ -108,7 +118,7 @@ export async function saveSeoSettings(formData:FormData):Promise<ActionResult>{
 }
 
 export async function saveReservation(formData: FormData): Promise<ActionResult> {
-  const supabase = await getStaffClient();
+  const supabase = await getStaffClient("reservations");
   if (!supabase) return { ok: false, message: "ログインが切れました。再度ログインしてください。" };
   const { error } = await supabase.rpc("upsert_staff_reservation", {
     p_id: text(formData, "id") || null,
@@ -125,7 +135,7 @@ export async function saveReservation(formData: FormData): Promise<ActionResult>
 }
 
 export async function cancelReservation(id: string): Promise<ActionResult> {
-  const supabase = await getStaffClient();
+  const supabase = await getStaffClient("reservations");
   if (!supabase) return { ok: false, message: "ログインが切れました。再度ログインしてください。" };
   const { error } = await supabase.from("reservations").update({ status: "CANCELLED" }).eq("id", id);
   if (error) return { ok: false, message: "予約をキャンセルできませんでした。" };
@@ -134,7 +144,7 @@ export async function cancelReservation(id: string): Promise<ActionResult> {
 }
 
 export async function saveSiteSettings(formData:FormData):Promise<ActionResult>{
-  const supabase=await getStaffClient();
+  const supabase=await getStaffClient("store");
   if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
   let registrations;
   try { registrations=parseRegistrationEntries(JSON.parse(text(formData,"animal_registrations"))); }
@@ -170,7 +180,7 @@ export async function saveSiteSettings(formData:FormData):Promise<ActionResult>{
 }
 
 export async function saveSiteCopy(formData:FormData):Promise<ActionResult>{
-  const supabase=await getStaffClient();
+  const supabase=await getStaffClient("site");
   if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
   const keys=["hero","about","friends","guide_reservation","guide_parking","guide_access","reservation","footer"];
   const rows=keys.map((section_key,index)=>({section_key,heading:text(formData,`${section_key}_heading`),body:text(formData,`${section_key}_body`),sort_order:(index+1)*10,published:true}));
@@ -181,7 +191,7 @@ export async function saveSiteCopy(formData:FormData):Promise<ActionResult>{
 }
 
 export async function uploadSiteImage(formData:FormData):Promise<ActionResult>{
-  const supabase=await getStaffClient();
+  const supabase=await getStaffClient("media");
   if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
   const slot=text(formData,"slot");
   if(!["hero","about"].includes(slot))return{ok:false,message:"写真の場所を確認してください。"};
@@ -211,7 +221,7 @@ async function storeImage(supabase:Awaited<ReturnType<typeof createClient>>,file
 }
 
 export async function deletePig(id:string):Promise<ActionResult>{
-  const supabase=await getStaffClient();
+  const supabase=await getStaffClient("pigs");
   if(!supabase)return {ok:false,message:"ログインが切れました。再度ログインしてください。"};
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))return {ok:false,message:"削除対象を確認してください。"};
   const {data,error}=await supabase.from("pigs").delete().eq("id",id).select("id");
@@ -222,7 +232,7 @@ export async function deletePig(id:string):Promise<ActionResult>{
 }
 
 export async function savePig(formData:FormData):Promise<ActionResult>{
-  const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const supabase=await getStaffClient("pigs");if(!supabase)return{ok:false,message:"この操作を行う権限がありません。"};
   const id=text(formData,"id");let imagePath=text(formData,"image_path");const file=formData.get("image");
   if(file instanceof File&&file.size>0){const stored=await storeImage(supabase,file,"pigs");if(!stored.path)return{ok:false,message:stored.message};imagePath=stored.path}
   const payload={name:text(formData,"name"),breed:text(formData,"breed")||"マイクロブタ",bio:text(formData,"bio")||null,image_path:imagePath||null,sort_order:Number(formData.get("sort_order"))||0,published:formData.get("published")==="on"};
@@ -231,14 +241,14 @@ export async function savePig(formData:FormData):Promise<ActionResult>{
 }
 
 export async function saveFaq(formData:FormData):Promise<ActionResult>{
-  const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const supabase=await getStaffClient("faqs");if(!supabase)return{ok:false,message:"この操作を行う権限がありません。"};
   const id=text(formData,"id");const payload={question:text(formData,"question"),answer:text(formData,"answer"),sort_order:Number(formData.get("sort_order"))||0,published:formData.get("published")==="on"};
   const{error}=id?await supabase.from("faqs").update(payload).eq("id",id):await supabase.from("faqs").insert(payload);
   if(error)return{ok:false,message:"よくある質問を保存できませんでした。"};revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"よくある質問を保存しました。"};
 }
 
 export async function savePricingSettings(formData:FormData):Promise<ActionResult>{
-  const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const supabase=await getStaffClient("pricing");if(!supabase)return{ok:false,message:"この操作を行う権限がありません。"};
   const payload={heading:text(formData,"heading"),description:text(formData,"description"),note:text(formData,"note"),published:formData.get("published")==="on"};
   if(!payload.heading||payload.heading.length>100||payload.description.length>1000||payload.note.length>1000)return{ok:false,message:"見出し・案内文・注意書きの文字数を確認してください。"};
   const{error}=await supabase.from("pricing_settings").upsert({id:true,...payload},{onConflict:"id"});
@@ -247,7 +257,7 @@ export async function savePricingSettings(formData:FormData):Promise<ActionResul
 }
 
 export async function savePricingItem(formData:FormData):Promise<ActionResult>{
-  const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const supabase=await getStaffClient("pricing");if(!supabase)return{ok:false,message:"この操作を行う権限がありません。"};
   const id=text(formData,"id"),payload={label:text(formData,"label"),price:text(formData,"price"),description:text(formData,"description")||null,sort_order:Number(formData.get("sort_order"))||0,published:formData.get("published")==="on"};
   if(!payload.label||!payload.price||payload.label.length>100||payload.price.length>100||(payload.description?.length??0)>500)return{ok:false,message:"料金区分・金額・補足の内容を確認してください。"};
   const result=id?await supabase.from("pricing_items").update(payload).eq("id",id).select("id"):await supabase.from("pricing_items").insert(payload).select("id");
@@ -256,14 +266,14 @@ export async function savePricingItem(formData:FormData):Promise<ActionResult>{
 }
 
 export async function deletePricingItem(id:string):Promise<ActionResult>{
-  const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const supabase=await getStaffClient("pricing");if(!supabase)return{ok:false,message:"この操作を行う権限がありません。"};
   const{data,error}=await supabase.from("pricing_items").delete().eq("id",id).select("id");
   if(error||!data?.length)return{ok:false,message:"料金項目を削除できませんでした。"};
   revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"料金項目を削除しました。"};
 }
 
 export async function uploadLibraryImage(formData:FormData):Promise<ActionResult>{
-  const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const supabase=await getStaffClient("media");if(!supabase)return{ok:false,message:"この操作を行う権限がありません。"};
   const files=formData.getAll("images").filter((item):item is File=>item instanceof File&&item.size>0);
   if(files.length===0)return{ok:false,message:"写真を選択してください。"};
   if(files.length>20)return{ok:false,message:"一度に追加できる写真は20枚までです。"};
@@ -274,9 +284,67 @@ export async function uploadLibraryImage(formData:FormData):Promise<ActionResult
 }
 
 export async function chooseSiteImage(formData:FormData):Promise<ActionResult>{
-  const supabase=await getStaffClient();if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
+  const supabase=await getStaffClient("media");if(!supabase)return{ok:false,message:"この操作を行う権限がありません。"};
   const slot=text(formData,"slot"),path=text(formData,"path");if(!["hero","hero_mobile","about","exterior"].includes(slot)||!path)return{ok:false,message:"写真と表示場所を選択してください。"};
   const columns={hero:"hero_image_path",hero_mobile:"hero_mobile_image_path",about:"about_image_path",exterior:"exterior_image_path"} as const;
   const column=columns[slot as keyof typeof columns];const{error}=await supabase.from("site_settings").update({[column]:path}).eq("id",true);
   if(error)return{ok:false,message:"写真を設定できませんでした。"};revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"公開サイトの写真を変更しました。"};
+}
+
+function permissionsFrom(formData: FormData): StaffPermissions {
+  return Object.fromEntries(permissionOptions.map(([key]) => [key, formData.get(`permission_${key}`) === "on"]));
+}
+
+export async function createManagementAccount(formData: FormData): Promise<ActionResult> {
+  if (!await getOwnerClient()) return { ok: false, message: "オーナー権限が必要です。" };
+  const admin = createAdminClient();
+  if (!admin) return { ok: false, message: "アカウント発行用のサーバー設定が未完了です。" };
+  const email = text(formData, "email").toLowerCase();
+  const password = text(formData, "password");
+  const displayName = text(formData, "display_name");
+  const role = text(formData, "role") === "ADMIN" ? "ADMIN" : "STAFF";
+  if (!/^\S+@\S+\.\S+$/.test(email) || password.length < 8 || !displayName) {
+    return { ok: false, message: "名前・メールアドレス・8文字以上の仮パスワードを確認してください。" };
+  }
+  const { data, error } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { display_name: displayName },
+  });
+  if (error || !data.user) return { ok: false, message: error?.message.includes("already") ? "このメールアドレスは登録済みです。" : "アカウントを発行できませんでした。" };
+  const permissions = role === "ADMIN"
+    ? Object.fromEntries(permissionOptions.map(([key]) => [key, true]))
+    : permissionsFrom(formData);
+  const { error: profileError } = await admin.from("profiles").upsert({
+    id: data.user.id,
+    email,
+    display_name: displayName,
+    role,
+    permissions,
+  });
+  if (profileError) {
+    await admin.auth.admin.deleteUser(data.user.id);
+    return { ok: false, message: "権限設定を保存できなかったため、アカウント発行を中止しました。" };
+  }
+  revalidatePath("/admin");
+  return { ok: true, message: `${role === "ADMIN" ? "オーナー" : "スタッフ"}アカウントを発行しました。` };
+}
+
+export async function updateManagementAccount(formData: FormData): Promise<ActionResult> {
+  const ownerClient = await getOwnerClient();
+  if (!ownerClient) return { ok: false, message: "オーナー権限が必要です。" };
+  const id = text(formData, "id");
+  const displayName = text(formData, "display_name");
+  const role = text(formData, "role") === "ADMIN" ? "ADMIN" : "STAFF";
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !displayName) return { ok: false, message: "アカウント情報を確認してください。" };
+  const { data: { user } } = await ownerClient.auth.getUser();
+  if (user?.id === id && role !== "ADMIN") return { ok: false, message: "自分自身のオーナー権限は解除できません。" };
+  const permissions = role === "ADMIN"
+    ? Object.fromEntries(permissionOptions.map(([key]) => [key, true]))
+    : permissionsFrom(formData);
+  const { data, error } = await ownerClient.from("profiles").update({ display_name: displayName, role, permissions }).eq("id", id).select("id");
+  if (error || !data?.length) return { ok: false, message: "権限設定を保存できませんでした。" };
+  revalidatePath("/admin");
+  return { ok: true, message: "アカウントの種類と権限を更新しました。" };
 }
