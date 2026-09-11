@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sendReservationEmails } from "@/lib/reservation-email";
+import { addCalendarMonths, dateStringInTokyo } from "@/lib/booking-window";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -9,6 +10,8 @@ export async function POST(request: Request) {
   if (!url || !key) return NextResponse.json({ ok: true, demo: true });
 
   const date=String(body.p_reservation_date??""),start=String(body.p_start_time??"");
+  const today=dateStringInTokyo(),maxReservationDate=addCalendarMonths(today,1);
+  if(date>maxReservationDate)return NextResponse.json({ok:false,code:"BOOKING_WINDOW"},{status:400});
   const headers={apikey:key,Authorization:`Bearer ${key}`};
   const [scheduleResponse,exceptionResponse]=await Promise.all([
     fetch(`${url}/rest/v1/business_schedule?id=eq.true&select=closed_weekdays,open_time,close_time`,{headers,cache:"no-store"}),
