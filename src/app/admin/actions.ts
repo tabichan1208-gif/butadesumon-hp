@@ -105,7 +105,7 @@ export async function saveEmailSettings(formData:FormData):Promise<ActionResult>
   const{error}=await supabase.from("email_settings").upsert({id:true,...payload},{onConflict:"id"});
   if(error)return{ok:false,message:"メール設定を保存できませんでした。メール設定用のSQLを適用してから、もう一度お試しください。"};
   revalidatePath("/admin");
-  return{ok:true,message:"メール設定を保存しました。Gmail接続までは自動送信されません。"};
+  return{ok:true,message:"予約メールの設定を保存しました。"};
 }
 
 export async function saveSeoSettings(formData:FormData):Promise<ActionResult>{
