@@ -44,7 +44,8 @@ function render(template: string, reservation: ReservationEmailData) {
 
 async function send(to:string,subject:string,body:string) {
   const apiKey=process.env.RESEND_API_KEY;
-  const from=process.env.EMAIL_FROM;
+  const domain=process.env.RESEND_EMAIL_DOMAIN;
+  const from=process.env.EMAIL_FROM||(domain?`豚ですもん。 <reserve@${domain}>`:"");
   if(!apiKey||!from)return {ok:false,reason:"EMAIL_NOT_CONFIGURED"};
   const response=await fetch("https://api.resend.com/emails",{
     method:"POST",
