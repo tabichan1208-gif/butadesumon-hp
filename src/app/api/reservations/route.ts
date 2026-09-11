@@ -1,4 +1,4 @@
-import { after, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { sendReservationEmails } from "@/lib/reservation-email";
 
 export async function POST(request: Request) {
@@ -29,11 +29,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, code }, { status: code.includes("CAPACITY") || code.includes("PARKING") ? 409 : 400 });
   }
   const id=String(await response.json());
-  after(()=>sendReservationEmails({
+  await sendReservationEmails({
     id,date,time:start,duration:Number(body.p_duration_minutes),
     adults:Number(body.p_adults),children:Number(body.p_children),infants:Number(body.p_infants),
     parking:Boolean(body.p_parking),name:String(body.p_customer_name??""),phone:String(body.p_phone??""),
     email:String(body.p_email??""),note:String(body.p_note??""),
-  }));
+  }).catch(error=>console.error("Reservation email task failed",error));
   return NextResponse.json({ ok: true, id });
 }
