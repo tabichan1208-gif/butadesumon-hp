@@ -57,12 +57,14 @@ async function send(to:string,subject:string,body:string) {
 
 export async function sendReservationEmails(reservation:ReservationEmailData) {
   const admin=createAdminClient();
-  if(!admin)return;
-  const {data}=await admin.from("email_settings").select("customer_email_enabled,customer_subject,customer_body,store_email_enabled,store_notification_email,store_subject,store_body").eq("id",true).maybeSingle();
+  if(!admin){console.error("Reservation email configuration failed",{reason:"SUPABASE_ADMIN_NOT_CONFIGURED"});return;}
+  const {data,error}=await admin.from("email_settings").select("customer_email_enabled,customer_subject,customer_body,store_email_enabled,store_notification_email,store_subject,store_body").eq("id",true).maybeSingle();
+  if(error){console.error("Reservation email configuration failed",{reason:"EMAIL_SETTINGS_QUERY_FAILED",code:error.code,message:error.message});return;}
   const settings:EmailSettings={...defaultEmailSettings,...(data??{})};
   const messages:Promise<{ok:boolean;reason:string}>[]=[];
   if(settings.customer_email_enabled&&reservation.email)messages.push(send(reservation.email,render(settings.customer_subject,reservation),render(settings.customer_body,reservation)));
   if(settings.store_email_enabled&&settings.store_notification_email)messages.push(send(settings.store_notification_email,render(settings.store_subject,reservation),render(settings.store_body,reservation)));
+  console.info("Reservation email task",{messageCount:messages.length,customerEnabled:settings.customer_email_enabled,customerHasAddress:Boolean(reservation.email),storeEnabled:settings.store_email_enabled,storeHasAddress:Boolean(settings.store_notification_email),apiKeyConfigured:Boolean(process.env.RESEND_API_KEY),domainConfigured:Boolean(process.env.RESEND_EMAIL_DOMAIN||process.env.EMAIL_FROM)});
   const results=await Promise.allSettled(messages);
   for(const result of results){
     if(result.status==="rejected"||!result.value.ok)console.error("Reservation email delivery failed",result.status==="rejected"?result.reason:result.value.reason);
