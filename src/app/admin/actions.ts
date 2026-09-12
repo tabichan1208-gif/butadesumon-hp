@@ -358,3 +358,13 @@ export async function updateManagementAccount(formData: FormData): Promise<Actio
   revalidatePath("/admin");
   return { ok: true, message: "アカウントの種類と権限を更新しました。" };
 }
+
+export async function resetManagementPassword(formData:FormData):Promise<ActionResult>{
+  const administrator=await getAdministratorContext();
+  if(!administrator)return{ok:false,message:"管理者権限が必要です。"};
+  const id=text(formData,"id"),password=text(formData,"temporary_password");
+  if(!/^[0-9a-f-]{36}$/i.test(id)||password.length<8)return{ok:false,message:"8文字以上の仮パスワードを入力してください。"};
+  const{error}=await administrator.admin.auth.admin.updateUserById(id,{password});
+  if(error)return{ok:false,message:"仮パスワードを再発行できませんでした。"};
+  return{ok:true,message:"仮パスワードを再発行しました。本人へ安全な方法で伝えてください。"};
+}
