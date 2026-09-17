@@ -119,7 +119,7 @@ function ReservationEditor({reservation,date,pending,onClose,onSubmit,onCancel}:
 
 function Timeline({reservations}:{reservations:AdminReservation[]}) { const slots=timeline(reservations);return <div className="admin-panel timeline-panel"><div className="panel-head"><div><h2>店内タイムライン</h2><p>15分ごとの同時人数と駐車場</p></div></div>{slots.length===0?<p className="empty-state">予約が入ると表示されます。</p>:<div className="timeline-list">{slots.map(s=><div key={s.time}><time>{s.time}</time><span className="occupancy"><i style={{width:`${Math.min(100,s.guests/8*100)}%`}}/></span><b>{s.guests}/8名</b><small>{s.parking?"🚗 使用中":"駐車場 空き"}</small></div>)}</div>}</div> }
 
-function timeline(reservations:AdminReservation[]){if(!reservations.length)return[];const toMinutes=(t:string)=>{const[h,m]=t.split(":").map(Number);return h*60+m};const start=Math.min(...reservations.map(r=>toMinutes(r.time)));const end=Math.max(...reservations.map(r=>toMinutes(r.time)+r.minutes));const slots=[];for(let minute=Math.floor(start/15)*15;minute<end;minute+=15){const current=reservations.filter(r=>{const s=toMinutes(r.time);return s<=minute&&s+r.minutes>minute});slots.push({time:`${String(Math.floor(minute/60)).padStart(2,"0")}:${String(minute%60).padStart(2,"0")}`,guests:current.reduce((n,r)=>n+r.guests,0),parking:current.some(r=>r.parking)})}return slots}
+function timeline(reservations:AdminReservation[]){if(!reservations.length)return[];const toMinutes=(t:string)=>{const[h,m]=t.split(":").map(Number);return h*60+m};const start=Math.min(...reservations.map(r=>toMinutes(r.time)));const end=Math.max(...reservations.map(r=>toMinutes(r.time)+r.minutes+(r.parking?15:0)));const slots=[];for(let minute=Math.floor(start/15)*15;minute<end;minute+=15){const current=reservations.filter(r=>{const s=toMinutes(r.time);return s<=minute&&s+r.minutes>minute});const parking=reservations.some(r=>{const s=toMinutes(r.time);return r.parking&&s<=minute&&s+r.minutes+15>minute});slots.push({time:`${String(Math.floor(minute/60)).padStart(2,"0")}:${String(minute%60).padStart(2,"0")}`,guests:current.reduce((n,r)=>n+r.guests,0),parking})}return slots}
 function ParkingTimeline({reservations,businessHours,onSelect}:{reservations:AdminReservation[];businessHours:string;onSelect:(reservation:AdminReservation)=>void}){
   const active=reservations.filter(r=>r.status!=="CANCELLED");
   const parking=active.filter(r=>r.parking);
@@ -127,17 +127,17 @@ function ParkingTimeline({reservations,businessHours,onSelect}:{reservations:Adm
   const clock=(value:number)=>`${String(Math.floor(value/60)).padStart(2,"0")}:${String(value%60).padStart(2,"0")}`;
   const hourMatches=businessHours.match(/\d{1,2}:\d{2}/g)??[];
   const reservationStart=parking.length?Math.min(...parking.map(r=>minutes(r.time))):Infinity;
-  const reservationEnd=parking.length?Math.max(...parking.map(r=>minutes(r.time)+r.minutes)):-Infinity;
+  const reservationEnd=parking.length?Math.max(...parking.map(r=>minutes(r.time)+r.minutes+15)):-Infinity;
   const opening=hourMatches[0]?minutes(hourMatches[0]):10*60;
   const closing=hourMatches[1]?minutes(hourMatches[1]):17*60;
   const rangeStart=Math.floor(Math.min(opening,reservationStart)/15)*15;
   const rangeEnd=Math.ceil(Math.max(closing,reservationEnd)/15)*15;
   const slots=[];for(let value=rangeStart;value<rangeEnd;value+=15)slots.push({time:clock(value),start:value});
-  const available=slots.filter(slot=>!parking.some(r=>minutes(r.time)<slot.start+15&&minutes(r.time)+r.minutes>slot.start)).length;
-  return <section className="admin-panel parking-timeline"><div className="panel-head parking-head"><div><h2>駐車場タイムライン</h2><p>営業時間内の空き状況です。予約者名を押すと詳細が開きます。</p></div><div className="parking-summary" aria-label={`全${slots.length}枠中${available}枠が空き`}><strong>{available}<small> / {slots.length}枠</small></strong><span>空き</span></div></div><div className="parking-legend" aria-label="駐車場タイムラインの凡例"><span><i className="free"/>空き</span><span><i className="busy"/>予約あり</span></div><div className="parking-slots">{slots.map(slot=>{
+  const available=slots.filter(slot=>!parking.some(r=>minutes(r.time)<slot.start+15&&minutes(r.time)+r.minutes+15>slot.start)).length;
+  return <section className="admin-panel parking-timeline"><div className="panel-head parking-head"><div><h2>駐車場タイムライン</h2><p>利用終了後も15分間、駐車場を確保します。予約者名を押すと詳細が開きます。</p></div><div className="parking-summary" aria-label={`全${slots.length}枠中${available}枠が空き`}><strong>{available}<small> / {slots.length}枠</small></strong><span>空き</span></div></div><div className="parking-legend" aria-label="駐車場タイムラインの凡例"><span><i className="free"/>空き</span><span><i className="busy"/>予約あり</span></div><div className="parking-slots">{slots.map(slot=>{
     const start=slot.start;
-    const current=parking.filter(r=>minutes(r.time)<start+15&&minutes(r.time)+r.minutes>start);
-    return <div className={current.length?"parking-slot reserved":"parking-slot"} key={slot.time}><div className="parking-slot-status"><time>{slot.time}</time><strong>{current.length?"予約あり":"空き"}</strong></div><small className="parking-slot-range">〜{clock(start+15)}</small>{current.map(r=><button type="button" key={r.id} onClick={()=>onSelect(r)} aria-label={`${r.name}様の駐車場予約を開く`}><b>{r.name} 様 ›</b><small>{r.time}〜{clock(minutes(r.time)+r.minutes)}</small></button>)}</div>;
+    const current=parking.filter(r=>minutes(r.time)<start+15&&minutes(r.time)+r.minutes+15>start);
+    return <div className={current.length?"parking-slot reserved":"parking-slot"} key={slot.time}><div className="parking-slot-status"><time>{slot.time}</time><strong>{current.length?"予約あり":"空き"}</strong></div><small className="parking-slot-range">〜{clock(start+15)}</small>{current.map(r=><button type="button" key={r.id} onClick={()=>onSelect(r)} aria-label={`${r.name}様の駐車場予約を開く`}><b>{r.name} 様 ›</b><small>{r.time}〜{clock(minutes(r.time)+r.minutes+15)}（終了後15分含む）</small></button>)}</div>;
   })}</div></section>;
 }
 function formatDate(value:string){const[y,m,d]=value.split("-");return `${y}年${Number(m)}月${Number(d)}日`}

@@ -55,7 +55,7 @@ export function ReservationForm({schedule,exceptions}:{schedule:BusinessSchedule
     if (!response?.ok) {
       const result = await response?.json().catch(() => ({}));
       const code = String(result?.code ?? "");
-      setError(code.includes("CLOSED_DAY") ? "この日は休業日のため予約できません。" : code.includes("CAPACITY") ? "この時間は定員に達しています。開始時間・利用時間・人数のいずれかを変更してください。" : code.includes("PARKING") ? "この時間の駐車場は予約済みです。「利用しない」を選ぶか、開始時間を変更してください。" : code.includes("PAST_DATE") ? "過去の日付は予約できません。" : code.includes("PAST_TIME") ? "過ぎた時間は予約できません。現在時刻より後の時間をお選びください。" : code.includes("BOOKING_WINDOW") ? "予約は本日から1か月先まで受け付けています。" : code.includes("BUSINESS_HOURS")||code.includes("business_hours") ? "選択した日の営業時間内でお選びください。" : code.includes("INVALID") ? "入力内容に不備があります。来店日・時間・人数・お名前・電話番号をご確認ください。" : "通信エラーのため予約を送信できませんでした。入力内容は残っています。時間をおいて再度お試しください。");
+      setError(code.includes("CLOSED_DAY") ? "この日は休業日のため予約できません。" : code.includes("CAPACITY") ? "この時間は定員に達しています。開始時間・利用時間・人数のいずれかを変更してください。" : code.includes("PARKING") ? "この時間または利用終了後15分以内の駐車場は予約済みです。「利用しない」を選ぶか、開始時間を変更してください。" : code.includes("PAST_DATE") ? "過去の日付は予約できません。" : code.includes("PAST_TIME") ? "過ぎた時間は予約できません。現在時刻より後の時間をお選びください。" : code.includes("BOOKING_WINDOW") ? "予約は本日から1か月先まで受け付けています。" : code.includes("BUSINESS_HOURS")||code.includes("business_hours") ? "選択した日の営業時間内でお選びください。" : code.includes("INVALID") ? "入力内容に不備があります。来店日・時間・人数・お名前・電話番号をご確認ください。" : "通信エラーのため予約を送信できませんでした。入力内容は残っています。時間をおいて再度お試しください。");
       window.setTimeout(()=>errorRef.current?.scrollIntoView({behavior:"smooth",block:"center"}),0);
       return;
     }
