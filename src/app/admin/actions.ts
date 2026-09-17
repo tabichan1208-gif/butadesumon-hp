@@ -27,7 +27,7 @@ export async function deleteLibraryImage(id: string): Promise<ActionResult> {
   return { ok: true, message: "画像をライブラリから削除しました。復旧用の元ファイルは保管されています。" };
 }
 
-type ActionResult = { ok: boolean; message: string };
+type ActionResult = { ok: boolean; message: string; errorCode?: string };
 
 export async function saveInteriorPhoto(formData: FormData): Promise<ActionResult> {
   const supabase = await getStaffClient("site");
@@ -78,14 +78,17 @@ function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
 
-function messageFor(error: string) {
-  if (error.includes("CAPACITY_EXCEEDED")) return "同じ時間帯の店内人数が8名を超えるため保存できません。";
-  if (error.includes("PARKING_UNAVAILABLE")) return "同じ時間帯または利用終了後15分以内に、駐車場を利用する予約があります。";
-  if (error.includes("reservations_business_hours")) return "予約は11:00〜18:00の滞在時間内で登録してください。";
-  if (error.includes("PAST_DATE")) return "過去の日付には予約を登録できません。";
-  if (error.includes("INVALID_RESERVATION")) return "入力内容を確認してください。";
-  if (error.includes("permission denied")) return "予約機能の権限設定を確認してください。";
-  return "予約を保存できませんでした。もう一度お試しください。";
+function reservationErrorFor(error: string): ActionResult {
+  if (error.includes("CAPACITY_EXCEEDED")) return {ok:false,errorCode:"CAPACITY",message:"この時間帯は店内の定員（合計8名）を超えるため保存できません。"};
+  if (error.includes("PARKING_UNAVAILABLE")) return {ok:false,errorCode:"PARKING",message:"この時間帯は、ほかの予約が駐車場を確保しています。"};
+  if (error.includes("CLOSED_DAY")) return {ok:false,errorCode:"CLOSED_DAY",message:"選択した日は休業日に設定されています。"};
+  if (error.includes("BUSINESS_HOURS")||error.includes("reservations_business_hours")) return {ok:false,errorCode:"BUSINESS_HOURS",message:"予約時間が営業時間の範囲外です。"};
+  if (error.includes("PAST_DATE")) return {ok:false,errorCode:"PAST_DATE",message:"過去の日付には予約を登録できません。"};
+  if (error.includes("PAST_TIME")) return {ok:false,errorCode:"PAST_TIME",message:"すでに過ぎた開始時間は選択できません。"};
+  if (error.includes("BOOKING_WINDOW")) return {ok:false,errorCode:"BOOKING_WINDOW",message:"WEB予約は本日から1か月先まで登録できます。"};
+  if (error.includes("INVALID_RESERVATION")) return {ok:false,errorCode:"INVALID",message:"入力内容に不備があるため保存できません。"};
+  if (error.includes("permission denied")||error.includes("NOT_AUTHORIZED")) return {ok:false,errorCode:"PERMISSION",message:"このアカウントには予約を保存する権限がありません。"};
+  return {ok:false,errorCode:"UNKNOWN",message:"予約を保存できませんでした。時間をおいてもう一度お試しください。"};
 }
 
 export async function saveEmailSettings(formData:FormData):Promise<ActionResult>{
@@ -127,19 +130,28 @@ export async function saveReservation(formData: FormData): Promise<ActionResult>
   if (!supabase) return { ok: false, message: "ログインが切れました。再度ログインしてください。" };
   const source = text(formData, "source");
   const phone = text(formData, "phone");
+  const reservationDate=text(formData,"reservation_date"),startTime=text(formData,"start_time");
+  const duration=Number(formData.get("duration_minutes"));
+  const adults=Number(formData.get("adults")),children=Number(formData.get("children")),infants=Number(formData.get("infants"));
+  const customerName=text(formData,"customer_name"),email=text(formData,"email");
   const phoneOptional = source === "PHONE" || source === "WALK_IN";
-  if (!phoneOptional && !phone) return { ok: false, message: "WEB・その他の予約では電話番号を入力してください。" };
-  if (phone && (phone.length < 8 || phone.length > 30)) return { ok: false, message: "電話番号は8〜30文字で入力してください。" };
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(reservationDate)||!/^\d{2}:\d{2}$/.test(startTime)||![15,30,45,60].includes(duration))return{ok:false,errorCode:"DATE_TIME",message:"来店日・開始時間・利用時間を入力してください。"};
+  if(![adults,children,infants].every(value=>Number.isInteger(value)&&value>=0&&value<=8)||adults+children+infants<1)return{ok:false,errorCode:"PEOPLE",message:"人数は合計1名以上で入力してください。"};
+  if(!customerName||customerName.length>100)return{ok:false,errorCode:"NAME",message:"お名前を1〜100文字で入力してください。"};
+  if(!["WEB","PHONE","WALK_IN","OTHER"].includes(source))return{ok:false,errorCode:"SOURCE",message:"受付経路を選択してください。"};
+  if (!phoneOptional && !phone) return { ok: false, errorCode:"PHONE", message: "WEB・その他の予約では電話番号を入力してください。" };
+  if (phone && (phone.length < 8 || phone.length > 30)) return { ok: false, errorCode:"PHONE", message: "電話番号は8〜30文字で入力してください。" };
+  if(email&&!/^\S+@\S+\.\S+$/.test(email))return{ok:false,errorCode:"EMAIL",message:"メールアドレスの形式を確認してください。"};
   const { error } = await supabase.rpc("upsert_staff_reservation", {
     p_id: text(formData, "id") || null,
-    p_reservation_date: text(formData, "reservation_date"), p_start_time: text(formData, "start_time"),
-    p_duration_minutes: Number(formData.get("duration_minutes")), p_adults: Number(formData.get("adults")),
-    p_children: Number(formData.get("children")), p_infants: Number(formData.get("infants")),
-    p_parking: formData.get("parking") === "on", p_customer_name: text(formData, "customer_name"),
-    p_phone: phone, p_email: text(formData, "email") || null,
+    p_reservation_date: reservationDate, p_start_time: startTime,
+    p_duration_minutes: duration, p_adults: adults,
+    p_children: children, p_infants: infants,
+    p_parking: formData.get("parking") === "on", p_customer_name: customerName,
+    p_phone: phone, p_email: email || null,
     p_note: text(formData, "note") || null, p_source: source,
   });
-  if (error) return { ok: false, message: messageFor(error.message) };
+  if (error) return reservationErrorFor(error.message);
   revalidatePath("/admin");
   return { ok: true, message: "予約を保存しました。" };
 }
