@@ -32,7 +32,7 @@ export default async function AdminPage() {
     supabase.from("pricing_items").select("id,label,price,description,sort_order,published").order("sort_order").order("created_at")
   ]);
   const reservations=(data??[]).map(r=>({id:r.id,date:r.reservation_date,time:r.start_time.slice(0,5),minutes:r.duration_minutes,
-    name:r.customer_name,phone:r.phone,email:r.email??"",note:r.note??"",adults:r.adults,children:r.children,
+    name:r.customer_name,phone:r.phone??"",email:r.email??"",note:r.note??"",adults:r.adults,children:r.children,
     infants:r.infants,guests:r.adults+r.children+r.infants,parking:r.parking,source:r.source,status:r.status}));
   const settings={...defaultSettings,...settingsData,phone:settingsData?.phone??"",instagram_url:settingsData?.instagram_url??"",hero_image_path:settingsData?.hero_image_path??"",hero_mobile_image_path:settingsData?.hero_mobile_image_path??"",about_image_path:settingsData?.about_image_path??"",exterior_image_path:settingsData?.exterior_image_path??"",map_url:settingsData?.map_url??"",seo_canonical_url:settingsData?.seo_canonical_url??"",seo_image_path:settingsData?.seo_image_path??""};
   const copy={...defaultCopy};
