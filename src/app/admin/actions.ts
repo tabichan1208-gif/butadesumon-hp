@@ -125,14 +125,19 @@ export async function saveSeoSettings(formData:FormData):Promise<ActionResult>{
 export async function saveReservation(formData: FormData): Promise<ActionResult> {
   const supabase = await getStaffClient("reservations");
   if (!supabase) return { ok: false, message: "ログインが切れました。再度ログインしてください。" };
+  const source = text(formData, "source");
+  const phone = text(formData, "phone");
+  const phoneOptional = source === "PHONE" || source === "WALK_IN";
+  if (!phoneOptional && !phone) return { ok: false, message: "WEB・その他の予約では電話番号を入力してください。" };
+  if (phone && (phone.length < 8 || phone.length > 30)) return { ok: false, message: "電話番号は8〜30文字で入力してください。" };
   const { error } = await supabase.rpc("upsert_staff_reservation", {
     p_id: text(formData, "id") || null,
     p_reservation_date: text(formData, "reservation_date"), p_start_time: text(formData, "start_time"),
     p_duration_minutes: Number(formData.get("duration_minutes")), p_adults: Number(formData.get("adults")),
     p_children: Number(formData.get("children")), p_infants: Number(formData.get("infants")),
     p_parking: formData.get("parking") === "on", p_customer_name: text(formData, "customer_name"),
-    p_phone: text(formData, "phone"), p_email: text(formData, "email") || null,
-    p_note: text(formData, "note") || null, p_source: text(formData, "source"),
+    p_phone: phone, p_email: text(formData, "email") || null,
+    p_note: text(formData, "note") || null, p_source: source,
   });
   if (error) return { ok: false, message: messageFor(error.message) };
   revalidatePath("/admin");
