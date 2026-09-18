@@ -10,6 +10,7 @@ import { defaultCopy, defaultSettings, publicImageUrl } from "@/lib/site-content
 import type { Metadata } from "next";
 import { defaultPricingSettings } from "@/lib/pricing";
 import { defaultBusinessSchedule } from "@/lib/business-calendar";
+import { SITE_CANONICAL_URL } from "@/lib/seo";
 
 const fontMap={
   gothic:'"Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",sans-serif',
@@ -23,17 +24,25 @@ const fontMap={
 
 export async function generateMetadata():Promise<Metadata>{
   const supabase=await createClient();
-  const{data}=await supabase.from("site_settings").select("seo_title,seo_description,seo_keywords,seo_canonical_url,seo_image_path,seo_indexing_enabled,hero_image_path").eq("id",true).maybeSingle();
-  const settings={...defaultSettings,...(data??{})};
+  const{data}=await supabase.from("site_settings").select("seo_title,seo_description,seo_keywords,seo_image_path,seo_indexing_enabled,hero_image_path").eq("id",true).maybeSingle();
+  const settings={
+    ...defaultSettings,
+    ...(data??{}),
+    seo_title:data?.seo_title?.trim()||defaultSettings.seo_title,
+    seo_description:data?.seo_description?.trim()||defaultSettings.seo_description,
+    seo_keywords:data?.seo_keywords?.trim()||defaultSettings.seo_keywords,
+    seo_image_path:data?.seo_image_path??defaultSettings.seo_image_path,
+    hero_image_path:data?.hero_image_path??defaultSettings.hero_image_path,
+    seo_indexing_enabled:data?.seo_indexing_enabled??true,
+  };
   const image=publicImageUrl(settings.seo_image_path||settings.hero_image_path);
-  const canonical=/^https:\/\//.test(settings.seo_canonical_url)?settings.seo_canonical_url:undefined;
   return{
     title:settings.seo_title,
     description:settings.seo_description,
     keywords:String(settings.seo_keywords).split(/[,、]/).map((value:string)=>value.trim()).filter(Boolean),
-    alternates:canonical?{canonical}:undefined,
+    alternates:{canonical:SITE_CANONICAL_URL},
     robots:{index:settings.seo_indexing_enabled,follow:settings.seo_indexing_enabled},
-    openGraph:{type:"website",locale:"ja_JP",title:settings.seo_title,description:settings.seo_description,url:canonical,images:image?[{url:image}]:undefined},
+    openGraph:{type:"website",locale:"ja_JP",title:settings.seo_title,description:settings.seo_description,url:SITE_CANONICAL_URL,images:image?[{url:image}]:undefined},
     twitter:{card:image?"summary_large_image":"summary",title:settings.seo_title,description:settings.seo_description,images:image?[image]:undefined}
   };
 }

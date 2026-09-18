@@ -7,6 +7,7 @@ import { mediaUsage } from "@/lib/media-usage";
 import type { EmailSettings } from "@/lib/email-settings";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { managementRoleLabel, permissionOptions, type ManagementRole, type PermissionKey, type StaffPermissions } from "@/lib/permissions";
+import { SITE_CANONICAL_URL } from "@/lib/seo";
 
 export async function deleteLibraryImage(id: string): Promise<ActionResult> {
   const supabase = await getStaffClient("media");
@@ -114,9 +115,7 @@ export async function saveEmailSettings(formData:FormData):Promise<ActionResult>
 export async function saveSeoSettings(formData:FormData):Promise<ActionResult>{
   const supabase=await getStaffClient("seo");
   if(!supabase)return{ok:false,message:"ログインが切れました。再度ログインしてください。"};
-  const canonical=text(formData,"seo_canonical_url");
-  if(canonical&&!/^https:\/\/[^\s]+$/.test(canonical))return{ok:false,message:"正規URLは https:// から始まる公開サイトのURLを入力してください。"};
-  const payload={seo_title:text(formData,"seo_title"),seo_description:text(formData,"seo_description"),seo_keywords:text(formData,"seo_keywords"),seo_canonical_url:canonical||null,seo_image_path:text(formData,"seo_image_path")||null,seo_indexing_enabled:formData.get("seo_indexing_enabled")==="on"};
+  const payload={seo_title:text(formData,"seo_title"),seo_description:text(formData,"seo_description"),seo_keywords:text(formData,"seo_keywords"),seo_canonical_url:SITE_CANONICAL_URL,seo_image_path:text(formData,"seo_image_path")||null,seo_indexing_enabled:formData.get("seo_indexing_enabled")==="on"};
   if(!payload.seo_title||payload.seo_title.length>100)return{ok:false,message:"検索結果のタイトルを1〜100文字で入力してください。"};
   if(!payload.seo_description||payload.seo_description.length>300)return{ok:false,message:"検索結果の説明文を1〜300文字で入力してください。"};
   const{error}=await supabase.from("site_settings").update(payload).eq("id",true);
