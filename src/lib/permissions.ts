@@ -2,7 +2,7 @@ export const permissionOptions = [
   ["reservations", "予約管理"],
   ["email", "メール設定"],
   ["site", "サイト編集・店内写真"],
-  ["store", "店舗情報"],
+  ["store", "店舗情報・営業カレンダー"],
   ["pricing", "ご利用料金"],
   ["pigs", "こぶた紹介"],
   ["faqs", "よくある質問"],
@@ -13,6 +13,14 @@ export const permissionOptions = [
 export type PermissionKey = (typeof permissionOptions)[number][0];
 export type StaffPermissions = Partial<Record<PermissionKey, boolean>>;
 export type ManagementRole = "ADMIN" | "OWNER" | "STAFF";
+
+export function allManagementPermissions(): Required<StaffPermissions> {
+  return Object.fromEntries(permissionOptions.map(([key]) => [key, true])) as Required<StaffPermissions>;
+}
+
+export function effectivePermissions(role: ManagementRole, permissions: StaffPermissions): StaffPermissions {
+  return role === "ADMIN" || role === "OWNER" ? allManagementPermissions() : permissions;
+}
 
 export const menuPermission: Record<string, PermissionKey> = {
   "予約管理": "reservations",
@@ -27,7 +35,7 @@ export const menuPermission: Record<string, PermissionKey> = {
 };
 
 export function canAccess(role: ManagementRole, permissions: StaffPermissions, key: PermissionKey) {
-  return role === "ADMIN" || role === "OWNER" || permissions[key] === true;
+  return effectivePermissions(role, permissions)[key] === true;
 }
 
 export function managementRoleLabel(role: ManagementRole) {
