@@ -7,14 +7,16 @@ import { RegistrationRowsEditor } from "./registration-rows-editor";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { cancelReservation, deletePig, deleteLibraryImage, deletePricingItem, chooseSiteImage, saveEmailSettings, saveFaq, savePig, savePricingItem, savePricingSettings, saveReservation, saveSeoSettings, saveSiteCopy, saveSiteSettings } from "@/app/admin/actions";
+import { cancelReservation, createManagementAccount, deletePig, deleteLibraryImage, deletePricingItem, chooseSiteImage, saveEmailSettings, saveFaq, savePig, savePricingItem, savePricingSettings, saveReservation, saveSeoSettings, saveSiteCopy, saveSiteSettings, updateManagementAccount } from "@/app/admin/actions";
 import type { SiteCopy, SiteSettings } from "@/lib/site-content";
 import type { EmailSettings } from "@/lib/email-settings";
 import type { PricingItem, PricingSettings } from "@/lib/pricing";
 import { mediaUsage } from "@/lib/media-usage";
 import { publicImageUrl } from "@/lib/site-content";
+import { canAccess, managementRoleLabel, menuPermission, permissionOptions, type ManagementRole, type StaffPermissions } from "@/lib/permissions";
+import { BusinessCalendarEditor } from "./business-calendar-editor";
 
-const menu = ["予約管理","メール設定","サイト編集","店舗情報","ご利用料金","こぶた紹介","よくある質問","画像ライブラリ","SEO設定"];
+const menuEntries = [["予約管理","▦"],["メール設定","✉"],["サイト編集","✎"],["店舗情報","⌂"],["ご利用料金","¥"],["こぶた紹介","♡"],["よくある質問","?"],["画像ライブラリ","▧"],["SEO設定","⌕"],["アカウント管理","♙"]] as const;
 const sourceLabels: Record<string,string> = { WEB:"WEB", PHONE:"電話", WALK_IN:"店頭", OTHER:"その他" };
 const fontOptions = [
   ["gothic","すっきりゴシック（読みやすい）"],
@@ -33,17 +35,29 @@ export type AdminReservation = {
 export type AdminPig={id:string;name:string;breed:string;bio:string|null;image_path:string|null;sort_order:number;published:boolean};
 export type AdminFaq={id:string;question:string;answer:string;sort_order:number;published:boolean};
 export type AdminMedia={id:string;storage_path:string;alt_text:string|null;created_at:string};
+export type AdminProfile={id:string;email:string|null;display_name:string|null;role:ManagementRole;permissions:StaffPermissions;created_at?:string};
 
 function localDateString(date = new Date()) {
   const offset = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - offset).toISOString().slice(0,10);
 }
 
-export function AdminDashboard({reservations,settings,emailSettings,pricingSettings,pricingItems,copy,pigs,faqs,media,interior,interiorError}:{interior:InteriorPhoto[];interiorError:boolean;reservations:AdminReservation[];settings:SiteSettings;emailSettings:EmailSettings;pricingSettings:PricingSettings;pricingItems:PricingItem[];copy:SiteCopy;pigs:AdminPig[];faqs:AdminFaq[];media:AdminMedia[]}) {
-  const [active,setActive]=useState("予約管理");
+export function AdminDashboard({currentProfile,profiles,reservations,settings,emailSettings,pricingSettings,pricingItems,copy,pigs,faqs,media,interior,interiorError}:{currentProfile:AdminProfile;profiles:AdminProfile[];interior:InteriorPhoto[];interiorError:boolean;reservations:AdminReservation[];settings:SiteSettings;emailSettings:EmailSettings;pricingSettings:PricingSettings;pricingItems:PricingItem[];copy:SiteCopy;pigs:AdminPig[];faqs:AdminFaq[];media:AdminMedia[]}) {
+  const menu=menuEntries.filter(([label])=>label==="アカウント管理"?currentProfile.role==="ADMIN":canAccess(currentProfile.role,currentProfile.permissions,menuPermission[label]));
+  const [active,setActive]=useState<string>(menu[0]?.[0]??"権限未設定");
   const logout=async()=>{await createClient().auth.signOut();location.href="/admin/login"};
-  const content=active==="予約管理"?<ReservationPanel reservations={reservations} businessHours={settings.business_hours}/>:active==="メール設定"?<EmailSettingsEditor settings={emailSettings}/>:active==="サイト編集"?<div className="cms-stack"><SiteCopyEditor copy={copy} settings={settings} media={media}/><InteriorEditor photos={interior} media={media} loadError={interiorError}/></div>:active==="店舗情報"?<StoreSettingsEditor settings={settings}/>:active==="ご利用料金"?<PricingEditor settings={pricingSettings} items={pricingItems}/>:active==="こぶた紹介"?<PigEditor pigs={pigs} media={media}/>:active==="よくある質問"?<FaqEditor faqs={faqs}/>:active==="画像ライブラリ"?<MediaLibrary media={media} settings={settings} pigs={pigs} interior={interior} interiorError={interiorError}/>:<SeoSettingsEditor settings={settings} media={media}/>;
-  return <div className="admin-shell"><aside><div className="admin-brand"><span>MICRO PIG CAFE</span>豚ですもん。<small>管理画面</small></div><nav>{menu.map((m,i)=><button className={active===m?"active":""} onClick={()=>setActive(m)} key={m}><span>{["▦","✉","✎","⌂","¥","♡","?","▧","⌕"][i]}</span>{m}</button>)}</nav><Link href="/">← 公開サイトを見る</Link><button className="logout" onClick={logout}>ログアウト</button></aside><section className="admin-main"><header><div><p>店舗運営</p><h1>{active}</h1></div><div className="admin-user"><span>豚</span><div><b>店舗管理者</b><small>ログイン中</small></div></div></header>{content}</section></div>;
+  const content=active==="予約管理"?<ReservationPanel reservations={reservations} businessHours={settings.business_hours}/>:active==="メール設定"?<EmailSettingsEditor settings={emailSettings}/>:active==="サイト編集"?<div className="cms-stack"><SiteCopyEditor copy={copy} settings={settings} media={media}/><InteriorEditor photos={interior} media={media} loadError={interiorError}/></div>:active==="店舗情報"?<div className="cms-stack"><BusinessCalendarEditor/><StoreSettingsEditor settings={settings}/></div>:active==="ご利用料金"?<PricingEditor settings={pricingSettings} items={pricingItems}/>:active==="こぶた紹介"?<PigEditor pigs={pigs} media={media}/>:active==="よくある質問"?<FaqEditor faqs={faqs}/>:active==="画像ライブラリ"?<MediaLibrary media={media} settings={settings} pigs={pigs} interior={interior} interiorError={interiorError}/>:active==="SEO設定"?<SeoSettingsEditor settings={settings} media={media}/>:active==="アカウント管理"?<AccountManager profiles={profiles} currentUserId={currentProfile.id}/>:<section className="admin-panel"><h2>利用できる機能がありません</h2><p>オーナーに権限設定を依頼してください。</p></section>;
+  return <div className="admin-shell"><aside><div className="admin-brand"><span>MICRO PIG CAFE</span>豚ですもん。<small>管理画面</small></div><nav>{menu.map(([label,icon])=><button className={active===label?"active":""} onClick={()=>setActive(label)} key={label}><span>{icon}</span>{label}</button>)}</nav><Link href="/">← 公開サイトを見る</Link><button className="logout" onClick={logout}>ログアウト</button></aside><section className="admin-main"><header><div><p>店舗運営</p><h1>{active}</h1></div><div className="admin-user"><span>豚</span><div><b>{managementRoleLabel(currentProfile.role)}</b><small>{currentProfile.display_name||"ログイン中"}</small></div></div></header>{content}</section></div>;
+}
+
+function PermissionFields({permissions={reservations:true}}:{permissions?:StaffPermissions}){
+  return <fieldset className="permission-fields"><legend>利用できる機能</legend>{permissionOptions.map(([key,label])=><label key={key}><input type="checkbox" name={`permission_${key}`} defaultChecked={permissions[key]===true}/><span>{label}</span></label>)}</fieldset>;
+}
+
+function AccountManager({profiles,currentUserId}:{profiles:AdminProfile[];currentUserId:string}){
+  const router=useRouter();const[pending,startTransition]=useTransition();const[notice,setNotice]=useState("");
+  const run=(action:(data:FormData)=>Promise<{ok:boolean;message:string}>)=>(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const form=e.currentTarget;startTransition(async()=>{const result=await action(new FormData(form));setNotice(result.message);if(result.ok){if(action===createManagementAccount)form.reset();router.refresh()}})};
+  return <div className="cms-stack">{notice&&<p className="admin-notice">{notice}</p>}<form className="admin-panel account-create" onSubmit={run(createManagementAccount)}><div className="panel-head"><div><h2>新しいアカウントを発行</h2><p>仮パスワードは安全な方法で本人へ伝えてください。</p></div><button className="button" disabled={pending}>{pending?"発行中…":"アカウントを発行"}</button></div><div className="settings-fields"><label>表示名<input name="display_name" required placeholder="例：山田 花子"/></label><label>メールアドレス<input name="email" type="email" required/></label><label>仮パスワード<input name="password" type="password" minLength={8} required autoComplete="new-password"/></label><label>アカウント種類<select name="role" defaultValue="STAFF"><option value="STAFF">スタッフ</option><option value="OWNER">オーナー</option><option value="ADMIN">管理者</option></select></label></div><PermissionFields/></form><section className="admin-panel"><div className="panel-head"><div><h2>発行済みアカウント</h2><p>管理者はアカウント管理を含む全機能、オーナーは店舗運営の全機能、スタッフは選択した機能だけ利用できます。</p></div></div><div className="account-list">{profiles.map(profile=><form key={profile.id} className="manager-card account-card" onSubmit={run(updateManagementAccount)}><input type="hidden" name="id" value={profile.id}/><div className="manager-fields"><label>表示名<input name="display_name" defaultValue={profile.display_name??""} required/></label><label>メールアドレス<input value={profile.email??""} readOnly/></label><label>種類<select name="role" defaultValue={profile.role} disabled={profile.id===currentUserId}><option value="STAFF">スタッフ</option><option value="OWNER">オーナー</option><option value="ADMIN">管理者</option></select>{profile.id===currentUserId&&<input type="hidden" name="role" value="ADMIN"/>}</label></div><PermissionFields permissions={profile.permissions}/><button className="button" disabled={pending}>{pending?"保存中…":"権限を保存"}</button></form>)}</div></section></div>;
 }
 
 function EmailSettingsEditor({settings}:{settings:EmailSettings}){
