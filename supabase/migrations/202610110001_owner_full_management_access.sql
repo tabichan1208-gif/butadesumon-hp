@@ -33,3 +33,21 @@ as $$
       and role in ('STAFF', 'OWNER', 'ADMIN')
   );
 $$;
+
+-- The existing profiles policy delegates account management to is_admin().
+-- Keep that policy intact while allowing owners to manage accounts just like
+-- administrators.
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = auth.uid()
+      and role in ('ADMIN', 'OWNER')
+  );
+$$;
