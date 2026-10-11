@@ -14,6 +14,18 @@ export type PermissionKey = (typeof permissionOptions)[number][0];
 export type StaffPermissions = Partial<Record<PermissionKey, boolean>>;
 export type ManagementRole = "ADMIN" | "OWNER" | "STAFF";
 
+export function hasFullManagementAccess(role: ManagementRole) {
+  return role === "ADMIN" || role === "OWNER";
+}
+
+export function allManagementPermissions(): Required<StaffPermissions> {
+  return Object.fromEntries(permissionOptions.map(([key]) => [key, true])) as Required<StaffPermissions>;
+}
+
+export function effectivePermissions(role: ManagementRole, permissions: StaffPermissions): StaffPermissions {
+  return hasFullManagementAccess(role) ? allManagementPermissions() : permissions;
+}
+
 export const menuPermission: Record<string, PermissionKey> = {
   "予約管理": "reservations",
   "メール設定": "email",
@@ -27,7 +39,7 @@ export const menuPermission: Record<string, PermissionKey> = {
 };
 
 export function canAccess(role: ManagementRole, permissions: StaffPermissions, key: PermissionKey) {
-  return role === "ADMIN" || role === "OWNER" || permissions[key] === true;
+  return effectivePermissions(role, permissions)[key] === true;
 }
 
 export function managementRoleLabel(role: ManagementRole) {

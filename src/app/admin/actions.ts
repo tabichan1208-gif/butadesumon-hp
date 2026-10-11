@@ -6,7 +6,7 @@ import { parseRegistrationEntries } from "@/lib/animal-registrations";
 import { mediaUsage } from "@/lib/media-usage";
 import type { EmailSettings } from "@/lib/email-settings";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { managementRoleLabel, permissionOptions, type ManagementRole, type PermissionKey, type StaffPermissions } from "@/lib/permissions";
+import { allManagementPermissions, hasFullManagementAccess, managementRoleLabel, permissionOptions, type ManagementRole, type PermissionKey, type StaffPermissions } from "@/lib/permissions";
 
 export async function deleteLibraryImage(id: string): Promise<ActionResult> {
   const supabase = await getStaffClient("media");
@@ -61,17 +61,17 @@ async function getStaffClient(permission: PermissionKey) {
   if (!admin) return null;
   const { data: profile } = await admin.from("profiles").select("role,permissions").eq("id", user.id).single();
   const permissions = (profile?.permissions ?? {}) as StaffPermissions;
-  return profile && (["ADMIN", "OWNER"].includes(profile.role) || permissions[permission] === true) ? supabase : null;
+  return profile && (hasFullManagementAccess(profile.role) || permissions[permission] === true) ? supabase : null;
 }
 
-async function getAdministratorContext() {
+async function getManagementContext() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   const admin = createAdminClient();
   if (!admin) return null;
   const { data: profile } = await admin.from("profiles").select("role").eq("id", user.id).single();
-  return profile?.role === "ADMIN" ? { admin, userId: user.id } : null;
+  return profile && hasFullManagementAccess(profile.role) ? { admin, userId: user.id, role: profile.role } : null;
 }
 
 function text(formData: FormData, key: string) {
@@ -305,9 +305,9 @@ function permissionsFrom(formData: FormData): StaffPermissions {
 }
 
 export async function createManagementAccount(formData: FormData): Promise<ActionResult> {
-  const administrator = await getAdministratorContext();
-  if (!administrator) return { ok: false, message: "管理者権限が必要です。" };
-  const { admin } = administrator;
+  const manager = await getManagementContext();
+  if (!manager) return { ok: false, message: "管理者またはオーナー権限が必要です。" };
+  const { admin } = manager;
   const email = text(formData, "email").toLowerCase();
   const password = text(formData, "password");
   const displayName = text(formData, "display_name");
@@ -323,8 +323,8 @@ export async function createManagementAccount(formData: FormData): Promise<Actio
     user_metadata: { display_name: displayName },
   });
   if (error || !data.user) return { ok: false, message: error?.message.includes("already") ? "このメールアドレスは登録済みです。" : "アカウントを発行できませんでした。" };
-  const permissions = role === "ADMIN" || role === "OWNER"
-    ? Object.fromEntries(permissionOptions.map(([key]) => [key, true]))
+  const permissions = hasFullManagementAccess(role)
+    ? allManagementPermissions()
     : permissionsFrom(formData);
   const { error: profileError } = await admin.from("profiles").upsert({
     id: data.user.id,
@@ -342,18 +342,18 @@ export async function createManagementAccount(formData: FormData): Promise<Actio
 }
 
 export async function updateManagementAccount(formData: FormData): Promise<ActionResult> {
-  const administrator = await getAdministratorContext();
-  if (!administrator) return { ok: false, message: "管理者権限が必要です。" };
+  const manager = await getManagementContext();
+  if (!manager) return { ok: false, message: "管理者またはオーナー権限が必要です。" };
   const id = text(formData, "id");
   const displayName = text(formData, "display_name");
   const requestedRole = text(formData, "role");
   const role: ManagementRole = ["ADMIN", "OWNER", "STAFF"].includes(requestedRole) ? requestedRole as ManagementRole : "STAFF";
   if (!/^[0-9a-f-]{36}$/i.test(id) || !displayName) return { ok: false, message: "アカウント情報を確認してください。" };
-  if (administrator.userId === id && role !== "ADMIN") return { ok: false, message: "自分自身の管理者権限は解除できません。" };
-  const permissions = role === "ADMIN" || role === "OWNER"
-    ? Object.fromEntries(permissionOptions.map(([key]) => [key, true]))
+  if (manager.userId === id && role !== manager.role) return { ok: false, message: "自分自身のアカウント種類は変更できません。" };
+  const permissions = hasFullManagementAccess(role)
+    ? allManagementPermissions()
     : permissionsFrom(formData);
-  const { data, error } = await administrator.admin.from("profiles").update({ display_name: displayName, role, permissions }).eq("id", id).select("id");
+  const { data, error } = await manager.admin.from("profiles").update({ display_name: displayName, role, permissions }).eq("id", id).select("id");
   if (error || !data?.length) return { ok: false, message: "権限設定を保存できませんでした。" };
   revalidatePath("/admin");
   return { ok: true, message: "アカウントの種類と権限を更新しました。" };
