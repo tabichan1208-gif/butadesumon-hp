@@ -6,14 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "verify:egress": "node scripts/verify-egress.mjs",
+    "images:prepare-webp": "node scripts/prepare-webp.mjs",
+    "verify:images": "node scripts/verify-images.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "sharp": "0.34.5"
   },
   "devDependencies": {
     "@types/node": "^22",

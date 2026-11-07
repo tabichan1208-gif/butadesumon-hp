@@ -1,6 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { prepareImage } from "@/lib/image-optimization.mjs";
+import { revalidatePath, updateTag } from "next/cache";
+import { PUBLIC_CONTENT_TAG } from "@/lib/public-content";
 import { createClient } from "@/lib/supabase/server";
 import { parseRegistrationEntries } from "@/lib/animal-registrations";
 import { mediaUsage } from "@/lib/media-usage";
@@ -40,7 +42,7 @@ export async function saveInteriorPhoto(formData: FormData): Promise<ActionResul
   const payload={image_path:path,caption,sort_order:order,published:formData.get("published")==="on"};
   const result=id ? await supabase.from("interior_photos").update(payload).eq("id",id).select("id") : await supabase.from("interior_photos").insert(payload).select("id");
   if(result.error || !result.data?.length)return {ok:false,message:"保存できませんでした。店内写真用のSQLと権限を確認してください。"};
-  revalidatePath("/");revalidatePath("/admin");
+  updateTag(PUBLIC_CONTENT_TAG);revalidatePath("/");revalidatePath("/admin");
   return {ok:true,message:"店内写真を保存しました。"};
 }
 
@@ -49,7 +51,7 @@ export async function removeInteriorPhoto(id:string):Promise<ActionResult>{
   if(!supabase)return {ok:false,message:"再度ログインしてください。"};
   const {data,error}=await supabase.from("interior_photos").delete().eq("id",id).select("id");
   if(error || !data?.length)return {ok:false,message:"掲載を解除できませんでした。画面を更新してください。"};
-  revalidatePath("/");revalidatePath("/admin");
+  updateTag(PUBLIC_CONTENT_TAG);revalidatePath("/");revalidatePath("/admin");
   return {ok:true,message:"店内写真の掲載を解除しました。画像ライブラリの写真は残っています。"};
 }
 
@@ -118,7 +120,7 @@ export async function saveSeoSettings(formData:FormData):Promise<ActionResult>{
   if(!payload.seo_description||payload.seo_description.length>300)return{ok:false,message:"検索結果の説明文を1〜300文字で入力してください。"};
   const{error}=await supabase.from("site_settings").update(payload).eq("id",true);
   if(error)return{ok:false,message:"SEO設定を保存できませんでした。SEO設定用のSQLを適用してから、もう一度お試しください。"};
-  revalidatePath("/");revalidatePath("/admin");
+  updateTag(PUBLIC_CONTENT_TAG);revalidatePath("/");revalidatePath("/admin");
   return{ok:true,message:"SEO設定を保存しました。検索結果への反映には時間がかかる場合があります。"};
 }
 
@@ -180,13 +182,13 @@ export async function saveSiteSettings(formData:FormData):Promise<ActionResult>{
   if(payload.animal_registration_published && (!entries.length||entries.some(row=>!row.type||!row.number)))return {ok:false,message:"公開する場合は種別と登録番号の組を1行以上、空欄なく入力してください。"};
   const{error}=await supabase.from("site_settings").update(payload).eq("id",true);
   if(error)return{ok:false,message:"店舗・デザイン設定を保存できませんでした。"};
-  revalidatePath("/");revalidatePath("/admin");
+  updateTag(PUBLIC_CONTENT_TAG);revalidatePath("/");revalidatePath("/admin");
   return{ok:true,message:"店舗・デザイン設定を保存しました。"};
 }
 
-export async function saveBusinessSchedule(formData:FormData):Promise<ActionResult>{const supabase=await getStaffClient("store");if(!supabase)return{ok:false,message:"店舗情報の権限がありません。"};const closed=[1,2,3,4,5,6,7].filter(day=>formData.get(`closed_${day}`)==="on"),open=text(formData,"open_time"),close=text(formData,"close_time");if(!/^\d{2}:\d{2}$/.test(open)||!/^\d{2}:\d{2}$/.test(close)||open>=close)return{ok:false,message:"通常営業時間を確認してください。"};const{error}=await supabase.from("business_schedule").upsert({id:true,closed_weekdays:closed,open_time:open,close_time:close});if(error)return{ok:false,message:"営業カレンダー用SQLを適用してから保存してください。"};revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"通常営業日を保存しました。"}}
-export async function saveBusinessException(formData:FormData):Promise<ActionResult>{const supabase=await getStaffClient("store");if(!supabase)return{ok:false,message:"店舗情報の権限がありません。"};const date=text(formData,"exception_date"),kind=text(formData,"kind")==="CLOSED"?"CLOSED":"OPEN",open=text(formData,"open_time")||null,close=text(formData,"close_time")||null;if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||(kind==="OPEN"&&(!open||!close||open>=close)))return{ok:false,message:"日付と営業時間を確認してください。"};const{error}=await supabase.from("business_exceptions").upsert({exception_date:date,kind,open_time:kind==="OPEN"?open:null,close_time:kind==="OPEN"?close:null,note:text(formData,"note")||null});if(error)return{ok:false,message:"特別営業日を保存できませんでした。"};revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"特別営業日を保存しました。"}}
-export async function deleteBusinessException(date:string):Promise<ActionResult>{const supabase=await getStaffClient("store");if(!supabase)return{ok:false,message:"店舗情報の権限がありません。"};const{error}=await supabase.from("business_exceptions").delete().eq("exception_date",date);if(error)return{ok:false,message:"削除できませんでした。"};revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"特別営業日を削除しました。"}}
+export async function saveBusinessSchedule(formData:FormData):Promise<ActionResult>{const supabase=await getStaffClient("store");if(!supabase)return{ok:false,message:"店舗情報の権限がありません。"};const closed=[1,2,3,4,5,6,7].filter(day=>formData.get(`closed_${day}`)==="on"),open=text(formData,"open_time"),close=text(formData,"close_time");if(!/^\d{2}:\d{2}$/.test(open)||!/^\d{2}:\d{2}$/.test(close)||open>=close)return{ok:false,message:"通常営業時間を確認してください。"};const{error}=await supabase.from("business_schedule").upsert({id:true,closed_weekdays:closed,open_time:open,close_time:close});if(error)return{ok:false,message:"営業カレンダー用SQLを適用してから保存してください。"};updateTag(PUBLIC_CONTENT_TAG);revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"通常営業日を保存しました。"}}
+export async function saveBusinessException(formData:FormData):Promise<ActionResult>{const supabase=await getStaffClient("store");if(!supabase)return{ok:false,message:"店舗情報の権限がありません。"};const date=text(formData,"exception_date"),kind=text(formData,"kind")==="CLOSED"?"CLOSED":"OPEN",open=text(formData,"open_time")||null,close=text(formData,"close_time")||null;if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||(kind==="OPEN"&&(!open||!close||open>=close)))return{ok:false,message:"日付と営業時間を確認してください。"};const{error}=await supabase.from("business_exceptions").upsert({exception_date:date,kind,open_time:kind==="OPEN"?open:null,close_time:kind==="OPEN"?close:null,note:text(formData,"note")||null});if(error)return{ok:false,message:"特別営業日を保存できませんでした。"};updateTag(PUBLIC_CONTENT_TAG);revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"特別営業日を保存しました。"}}
+export async function deleteBusinessException(date:string):Promise<ActionResult>{const supabase=await getStaffClient("store");if(!supabase)return{ok:false,message:"店舗情報の権限がありません。"};const{error}=await supabase.from("business_exceptions").delete().eq("exception_date",date);if(error)return{ok:false,message:"削除できませんでした。"};updateTag(PUBLIC_CONTENT_TAG);revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"特別営業日を削除しました。"}}
 
 export async function saveSiteCopy(formData:FormData):Promise<ActionResult>{
   const supabase=await getStaffClient("site");
@@ -195,7 +197,7 @@ export async function saveSiteCopy(formData:FormData):Promise<ActionResult>{
   const rows=keys.map((section_key,index)=>({section_key,heading:text(formData,`${section_key}_heading`),body:text(formData,`${section_key}_body`),sort_order:(index+1)*10,published:true}));
   const{error}=await supabase.from("site_content").upsert(rows,{onConflict:"section_key"});
   if(error)return{ok:false,message:"文章を保存できませんでした。"};
-  revalidatePath("/");revalidatePath("/admin");
+  updateTag(PUBLIC_CONTENT_TAG);revalidatePath("/");revalidatePath("/admin");
   return{ok:true,message:"サイトの文章を保存しました。"};
 }
 
@@ -206,27 +208,38 @@ export async function uploadSiteImage(formData:FormData):Promise<ActionResult>{
   if(!["hero","about"].includes(slot))return{ok:false,message:"写真の場所を確認してください。"};
   const file=formData.get("image");
   if(!(file instanceof File)||file.size===0)return{ok:false,message:"写真を選択してください。"};
-  if(!file.type.startsWith("image/")||file.size>8*1024*1024)return{ok:false,message:"8MB以下の画像を選択してください。"};
-  const extension=(file.name.split(".").pop()||"jpg").replace(/[^a-zA-Z0-9]/g,"");
-  const path=`${slot}/${Date.now()}.${extension}`;
-  const{error:uploadError}=await supabase.storage.from("site-media").upload(path,file,{contentType:file.type,upsert:false});
-  if(uploadError)return{ok:false,message:"写真をアップロードできませんでした。"};
-  await supabase.from("media_assets").insert({storage_path:path,alt_text:file.name,mime_type:file.type,size_bytes:file.size});
+  const stored=await storeImage(supabase,file,slot);
+  if(!stored.path)return{ok:false,message:stored.message};
+  const path=stored.path;
   const column=slot==="hero"?"hero_image_path":"about_image_path";
   const{error}=await supabase.from("site_settings").update({[column]:path}).eq("id",true);
   if(error)return{ok:false,message:"写真の設定を保存できませんでした。"};
-  revalidatePath("/");revalidatePath("/admin");
+  updateTag(PUBLIC_CONTENT_TAG);revalidatePath("/");revalidatePath("/admin");
   return{ok:true,message:"写真を変更しました。"};
 }
 
 async function storeImage(supabase:Awaited<ReturnType<typeof createClient>>,file:File,folder:string){
   if(!file.type.startsWith("image/")||file.size>8*1024*1024)return{path:"",message:"8MB以下の画像を選択してください。"};
   const extension=(file.name.split(".").pop()||"jpg").replace(/[^a-zA-Z0-9]/g,"");
-  const path=`${folder}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${extension}`;
-  const{error}=await supabase.storage.from("site-media").upload(path,file,{contentType:file.type,upsert:false});
+  const path=`${folder}/${crypto.randomUUID()}.${extension}`;
+  const bucket=supabase.storage.from("site-media");
+  const options={contentType:file.type,cacheControl:"31536000",upsert:false};
+  const{error}=await bucket.upload(path,file,options);
   if(error)return{path:"",message:"写真をアップロードできませんでした。"};
-  await supabase.from("media_assets").insert({storage_path:path,alt_text:file.name,mime_type:file.type,size_bytes:file.size});
-  return{path,message:""};
+  // Register the original before creating a variant, so it remains selectable/recoverable.
+  const{error:originalError}=await supabase.from("media_assets").insert({storage_path:path,alt_text:file.name,mime_type:file.type,size_bytes:file.size});
+  if(originalError)return{path:"",message:"原本は保存されましたが、画像ライブラリに登録できませんでした。"};
+  if(!["image/png","image/jpeg","image/webp"].includes(file.type))return{path,message:""};
+  try{
+    const candidate=await prepareImage(Buffer.from(await file.arrayBuffer()));
+    if(!candidate)return{path,message:""};
+    const variantPath=`${path}.webp`;
+    const{error:variantError}=await bucket.upload(variantPath,candidate.data,{...options,contentType:"image/webp"});
+    if(variantError)return{path,message:""};
+    const{error:assetError}=await supabase.from("media_assets").insert({storage_path:variantPath,alt_text:`${file.name}（軽量版）`,mime_type:"image/webp",size_bytes:candidate.data.length});
+    // Failed optimization/registration must never prevent choosing the saved original.
+    return{path:assetError?path:variantPath,message:""};
+  }catch{return{path,message:""};}
 }
 
 export async function deletePig(id:string):Promise<ActionResult>{
@@ -236,7 +249,7 @@ export async function deletePig(id:string):Promise<ActionResult>{
   const {data,error}=await supabase.from("pigs").delete().eq("id",id).select("id");
   if(error)return {ok:false,message:"削除できませんでした。こぶた削除用のSQLが適用されているか確認してください。"};
   if(!data?.length)return {ok:false,message:"対象が見つからないか、削除する権限がありません。画面を更新してください。"};
-  revalidatePath("/");revalidatePath("/admin");
+  updateTag(PUBLIC_CONTENT_TAG);revalidatePath("/");revalidatePath("/admin");
   return {ok:true,message:"こぶた紹介を削除しました。画像ライブラリの元写真は残しています。"};
 }
 
@@ -246,14 +259,14 @@ export async function savePig(formData:FormData):Promise<ActionResult>{
   if(file instanceof File&&file.size>0){const stored=await storeImage(supabase,file,"pigs");if(!stored.path)return{ok:false,message:stored.message};imagePath=stored.path}
   const payload={name:text(formData,"name"),breed:text(formData,"breed")||"マイクロブタ",bio:text(formData,"bio")||null,image_path:imagePath||null,sort_order:Number(formData.get("sort_order"))||0,published:formData.get("published")==="on"};
   const{error}=id?await supabase.from("pigs").update(payload).eq("id",id):await supabase.from("pigs").insert(payload);
-  if(error)return{ok:false,message:"こぶた情報を保存できませんでした。"};revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"こぶた情報を保存しました。"};
+  if(error)return{ok:false,message:"こぶた情報を保存できませんでした。"};updateTag(PUBLIC_CONTENT_TAG);revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"こぶた情報を保存しました。"};
 }
 
 export async function saveFaq(formData:FormData):Promise<ActionResult>{
   const supabase=await getStaffClient("faqs");if(!supabase)return{ok:false,message:"この操作を行う権限がありません。"};
   const id=text(formData,"id");const payload={question:text(formData,"question"),answer:text(formData,"answer"),sort_order:Number(formData.get("sort_order"))||0,published:formData.get("published")==="on"};
   const{error}=id?await supabase.from("faqs").update(payload).eq("id",id):await supabase.from("faqs").insert(payload);
-  if(error)return{ok:false,message:"よくある質問を保存できませんでした。"};revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"よくある質問を保存しました。"};
+  if(error)return{ok:false,message:"よくある質問を保存できませんでした。"};updateTag(PUBLIC_CONTENT_TAG);revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"よくある質問を保存しました。"};
 }
 
 export async function savePricingSettings(formData:FormData):Promise<ActionResult>{
@@ -262,7 +275,7 @@ export async function savePricingSettings(formData:FormData):Promise<ActionResul
   if(!payload.heading||payload.heading.length>100||payload.description.length>1000||payload.note.length>1000)return{ok:false,message:"見出し・案内文・注意書きの文字数を確認してください。"};
   const{error}=await supabase.from("pricing_settings").upsert({id:true,...payload},{onConflict:"id"});
   if(error)return{ok:false,message:"料金コーナーを保存できませんでした。料金用のSQLを適用してください。"};
-  revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"料金コーナーの設定を保存しました。"};
+  updateTag(PUBLIC_CONTENT_TAG);revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"料金コーナーの設定を保存しました。"};
 }
 
 export async function savePricingItem(formData:FormData):Promise<ActionResult>{
@@ -271,14 +284,14 @@ export async function savePricingItem(formData:FormData):Promise<ActionResult>{
   if(!payload.label||!payload.price||payload.label.length>100||payload.price.length>100||(payload.description?.length??0)>500)return{ok:false,message:"料金区分・金額・補足の内容を確認してください。"};
   const result=id?await supabase.from("pricing_items").update(payload).eq("id",id).select("id"):await supabase.from("pricing_items").insert(payload).select("id");
   if(result.error||!result.data?.length)return{ok:false,message:"料金項目を保存できませんでした。"};
-  revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"料金項目を保存しました。"};
+  updateTag(PUBLIC_CONTENT_TAG);revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"料金項目を保存しました。"};
 }
 
 export async function deletePricingItem(id:string):Promise<ActionResult>{
   const supabase=await getStaffClient("pricing");if(!supabase)return{ok:false,message:"この操作を行う権限がありません。"};
   const{data,error}=await supabase.from("pricing_items").delete().eq("id",id).select("id");
   if(error||!data?.length)return{ok:false,message:"料金項目を削除できませんでした。"};
-  revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"料金項目を削除しました。"};
+  updateTag(PUBLIC_CONTENT_TAG);revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"料金項目を削除しました。"};
 }
 
 export async function uploadLibraryImage(formData:FormData):Promise<ActionResult>{
@@ -287,7 +300,9 @@ export async function uploadLibraryImage(formData:FormData):Promise<ActionResult
   if(files.length===0)return{ok:false,message:"写真を選択してください。"};
   if(files.length>20)return{ok:false,message:"一度に追加できる写真は20枚までです。"};
   if(files.some(file=>!file.type.startsWith("image/")||file.size>8*1024*1024))return{ok:false,message:"1枚あたり8MB以下の画像を選択してください。"};
-  const stored=await Promise.all(files.map(file=>storeImage(supabase,file,"library")));
+  // Process one image at a time to bound memory during large PNG conversions.
+  const stored=[];
+  for(const file of files)stored.push(await storeImage(supabase,file,"library"));
   const failed=stored.find(item=>!item.path);if(failed)return{ok:false,message:failed.message};
   revalidatePath("/admin");return{ok:true,message:`${files.length}枚の画像をライブラリへ追加しました。`};
 }
@@ -297,7 +312,7 @@ export async function chooseSiteImage(formData:FormData):Promise<ActionResult>{
   const slot=text(formData,"slot"),path=text(formData,"path");if(!["hero","hero_mobile","about","exterior"].includes(slot)||!path)return{ok:false,message:"写真と表示場所を選択してください。"};
   const columns={hero:"hero_image_path",hero_mobile:"hero_mobile_image_path",about:"about_image_path",exterior:"exterior_image_path"} as const;
   const column=columns[slot as keyof typeof columns];const{error}=await supabase.from("site_settings").update({[column]:path}).eq("id",true);
-  if(error)return{ok:false,message:"写真を設定できませんでした。"};revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"公開サイトの写真を変更しました。"};
+  if(error)return{ok:false,message:"写真を設定できませんでした。"};updateTag(PUBLIC_CONTENT_TAG);revalidatePath("/");revalidatePath("/admin");return{ok:true,message:"公開サイトの写真を変更しました。"};
 }
 
 function permissionsFrom(formData: FormData): StaffPermissions {
