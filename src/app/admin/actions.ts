@@ -1,5 +1,6 @@
 "use server";
 
+import { prepareImage } from "@/lib/image-optimization.mjs";
 import { revalidatePath, updateTag } from "next/cache";
 import { PUBLIC_CONTENT_TAG } from "@/lib/public-content";
 import { createClient } from "@/lib/supabase/server";
@@ -207,12 +208,9 @@ export async function uploadSiteImage(formData:FormData):Promise<ActionResult>{
   if(!["hero","about"].includes(slot))return{ok:false,message:"写真の場所を確認してください。"};
   const file=formData.get("image");
   if(!(file instanceof File)||file.size===0)return{ok:false,message:"写真を選択してください。"};
-  if(!file.type.startsWith("image/")||file.size>8*1024*1024)return{ok:false,message:"8MB以下の画像を選択してください。"};
-  const extension=(file.name.split(".").pop()||"jpg").replace(/[^a-zA-Z0-9]/g,"");
-  const path=`${slot}/${crypto.randomUUID()}.${extension}`;
-  const{error:uploadError}=await supabase.storage.from("site-media").upload(path,file,{contentType:file.type,cacheControl:"31536000",upsert:false});
-  if(uploadError)return{ok:false,message:"写真をアップロードできませんでした。"};
-  await supabase.from("media_assets").insert({storage_path:path,alt_text:file.name,mime_type:file.type,size_bytes:file.size});
+  const stored=await storeImage(supabase,file,slot);
+  if(!stored.path)return{ok:false,message:stored.message};
+  const path=stored.path;
   const column=slot==="hero"?"hero_image_path":"about_image_path";
   const{error}=await supabase.from("site_settings").update({[column]:path}).eq("id",true);
   if(error)return{ok:false,message:"写真の設定を保存できませんでした。"};
@@ -224,10 +222,24 @@ async function storeImage(supabase:Awaited<ReturnType<typeof createClient>>,file
   if(!file.type.startsWith("image/")||file.size>8*1024*1024)return{path:"",message:"8MB以下の画像を選択してください。"};
   const extension=(file.name.split(".").pop()||"jpg").replace(/[^a-zA-Z0-9]/g,"");
   const path=`${folder}/${crypto.randomUUID()}.${extension}`;
-  const{error}=await supabase.storage.from("site-media").upload(path,file,{contentType:file.type,cacheControl:"31536000",upsert:false});
+  const bucket=supabase.storage.from("site-media");
+  const options={contentType:file.type,cacheControl:"31536000",upsert:false};
+  const{error}=await bucket.upload(path,file,options);
   if(error)return{path:"",message:"写真をアップロードできませんでした。"};
-  await supabase.from("media_assets").insert({storage_path:path,alt_text:file.name,mime_type:file.type,size_bytes:file.size});
-  return{path,message:""};
+  // Register the original before creating a variant, so it remains selectable/recoverable.
+  const{error:originalError}=await supabase.from("media_assets").insert({storage_path:path,alt_text:file.name,mime_type:file.type,size_bytes:file.size});
+  if(originalError)return{path:"",message:"原本は保存されましたが、画像ライブラリに登録できませんでした。"};
+  if(!["image/png","image/jpeg","image/webp"].includes(file.type))return{path,message:""};
+  try{
+    const candidate=await prepareImage(Buffer.from(await file.arrayBuffer()));
+    if(!candidate)return{path,message:""};
+    const variantPath=`${path}.webp`;
+    const{error:variantError}=await bucket.upload(variantPath,candidate.data,{...options,contentType:"image/webp"});
+    if(variantError)return{path,message:""};
+    const{error:assetError}=await supabase.from("media_assets").insert({storage_path:variantPath,alt_text:`${file.name}（軽量版）`,mime_type:"image/webp",size_bytes:candidate.data.length});
+    // Failed optimization/registration must never prevent choosing the saved original.
+    return{path:assetError?path:variantPath,message:""};
+  }catch{return{path,message:""};}
 }
 
 export async function deletePig(id:string):Promise<ActionResult>{
@@ -288,7 +300,9 @@ export async function uploadLibraryImage(formData:FormData):Promise<ActionResult
   if(files.length===0)return{ok:false,message:"写真を選択してください。"};
   if(files.length>20)return{ok:false,message:"一度に追加できる写真は20枚までです。"};
   if(files.some(file=>!file.type.startsWith("image/")||file.size>8*1024*1024))return{ok:false,message:"1枚あたり8MB以下の画像を選択してください。"};
-  const stored=await Promise.all(files.map(file=>storeImage(supabase,file,"library")));
+  // Process one image at a time to bound memory during large PNG conversions.
+  const stored=[];
+  for(const file of files)stored.push(await storeImage(supabase,file,"library"));
   const failed=stored.find(item=>!item.path);if(failed)return{ok:false,message:failed.message};
   revalidatePath("/admin");return{ok:true,message:`${files.length}枚の画像をライブラリへ追加しました。`};
 }

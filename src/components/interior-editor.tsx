@@ -7,6 +7,7 @@ import { saveInteriorPhoto, removeInteriorPhoto } from "@/app/admin/actions";
 import type { InteriorPhoto } from "@/lib/interior";
 import type { AdminMedia } from "./admin-dashboard";
 import { publicImageUrl } from "@/lib/site-content";
+import { optimizedBackground, isOptimizable } from "./public-photo";
 
 export function InteriorEditor({photos,media,loadError}:{photos:InteriorPhoto[];media:AdminMedia[];loadError:boolean}) {
   const [notice,setNotice]=useState("");
@@ -40,9 +41,9 @@ function PhotoForm({photo,media,pending,onSubmit,onRemove,nextOrder=0}:{photo?:I
   return <form className="interior-edit-card" onSubmit={onSubmit}>
     <h3>{photo?"掲載写真を編集":"写真を追加"}</h3>
     <input type="hidden" name="id" value={photo?.id??""}/><input type="hidden" name="image_path" value={path}/>
-    {path&&<div className="interior-edit-preview"><Image src={publicImageUrl(path)} alt="選択中の店内写真" fill unoptimized sizes="300px"/></div>}
+    {path&&<div className="interior-edit-preview"><Image src={publicImageUrl(path)} alt="選択中の店内写真" fill unoptimized={!isOptimizable(publicImageUrl(path))} sizes="300px"/></div>}
     <button type="button" className="library-select" disabled={pending} onClick={()=>setChoosing(!choosing)} aria-expanded={choosing}>{choosing?"写真選択を閉じる":"画像ライブラリから選ぶ"}</button>
-    {choosing&&<div className="picker-grid interior-picker">{media.length?media.map(item=><button type="button" className="picker-button" key={item.id} disabled={pending} onClick={()=>{setPath(item.storage_path);setChoosing(false);}}><span style={{backgroundImage:`url(${publicImageUrl(item.storage_path)})`}}/><small>{item.alt_text||"登録画像"}</small></button>):<p>先に画像ライブラリへ写真を追加してください。</p>}</div>}
+    {choosing&&<div className="picker-grid interior-picker">{media.length?media.map(item=><button type="button" className="picker-button" key={item.id} disabled={pending} onClick={()=>{setPath(item.storage_path);setChoosing(false);}}><span style={{backgroundImage:optimizedBackground(publicImageUrl(item.storage_path),320)}}/><small>{item.alt_text||"登録画像"}</small></button>):<p>先に画像ライブラリへ写真を追加してください。</p>}</div>}
     <label>写真の説明（任意・改行可）<textarea name="caption" rows={2} maxLength={500} defaultValue={photo?.caption??""}/></label>
     <label>表示順<input name="sort_order" type="number" step={1} min={-1000000} max={1000000} defaultValue={photo?.sort_order??nextOrder} required/></label>
     <label><input name="published" type="checkbox" defaultChecked={photo?.published??true}/> 公開する</label>
